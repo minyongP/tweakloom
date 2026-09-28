@@ -105,6 +105,12 @@ export const styleFields = {
     options: ["stretch", "flex-start", "center", "flex-end"],
   },
   gap: { label: "Gap", group: "Auto layout", type: "px" },
+  justifyItems: {
+    label: "Align in grid cells",
+    group: "Auto layout",
+    type: "select",
+    options: ["flex-start", "center", "flex-end", "stretch"],
+  },
   flexWrap: {
     label: "Wrap",
     group: "Auto layout",

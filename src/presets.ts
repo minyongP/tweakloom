@@ -30,7 +30,7 @@ export function createPreset(id: string): HTMLElement {
       border: "1px solid #d8d2e4",
       borderRadius: "8px",
       backgroundColor: "#ffffff",
-      minWidth: "160px",
+      width: "160px",
     });
   }
   if (id === "input") {

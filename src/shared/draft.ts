@@ -180,6 +180,8 @@ export function validateDraft(value: unknown): asserts value is Draft {
                 : field.type === "signed-px"
                   ? signedPx.test(op.after)
                   : px.test(op.after) ||
+                    (op.property === "width" &&
+                      ["100%", "fit-content"].includes(op.after)) ||
                     (["width", "height", "lineHeight"].includes(op.property) &&
                       op.after ===
                         (op.property === "lineHeight" ? "normal" : "auto"));

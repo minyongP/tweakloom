@@ -27,6 +27,7 @@ function start(channel: string) {
     editable = true,
     simulate = false,
     freeMove = false,
+    showGrid = true,
     snap = false;
   let lastReport = "",
     suppressClickUntil = 0;
@@ -43,6 +44,60 @@ function start(channel: string) {
   guide.style.cssText =
     "display:none;position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #7956ce;background:#7956ce22;border-radius:3px;";
   document.documentElement.append(guide);
+  const gridGuide = document.createElement("div");
+  gridGuide.setAttribute("aria-label", "Grid guides");
+  gridGuide.style.cssText =
+    "display:none;position:fixed;pointer-events:none;z-index:2147483646;";
+  document.documentElement.append(gridGuide);
+  function drawGrid() {
+    const chosen = selected ? candidates(selected)[0] : null;
+    const container = chosen?.hasAttribute("data-tweakloom-container")
+      ? chosen
+      : chosen?.parentElement?.closest<HTMLElement>(
+          "[data-tweakloom-container]",
+        );
+    gridGuide.style.display = "none";
+    if (!showGrid || simulate || !container) return;
+    const css = getComputedStyle(container);
+    if (!css.display.includes("grid")) return;
+    const cols = css.gridTemplateColumns.split(" ").filter(Boolean);
+    const rows =
+      css.gridTemplateRows === "none"
+        ? []
+        : css.gridTemplateRows.split(" ").filter(Boolean);
+    if (
+      !cols.length ||
+      cols[0] === "none" ||
+      cols.length > 12 ||
+      rows.length > 40
+    )
+      return;
+    const rect = container.getBoundingClientRect();
+    const px = (v: string) => parseFloat(v) || 0;
+    Object.assign(gridGuide.style, {
+      display: "grid",
+      left: `${rect.left + container.clientLeft + px(css.paddingLeft)}px`,
+      top: `${rect.top + container.clientTop + px(css.paddingTop)}px`,
+      width: `${container.clientWidth - px(css.paddingLeft) - px(css.paddingRight)}px`,
+      height: `${container.clientHeight - px(css.paddingTop) - px(css.paddingBottom)}px`,
+      gridTemplateColumns: css.gridTemplateColumns,
+      gridTemplateRows: rows.length ? css.gridTemplateRows : "1fr",
+      columnGap: css.columnGap,
+      rowGap: css.rowGap,
+      alignContent: css.alignContent,
+      justifyContent: css.justifyContent,
+    });
+    gridGuide.replaceChildren(
+      ...Array.from({ length: cols.length * Math.max(1, rows.length) }, () => {
+        const cell = document.createElement("div");
+        cell.style.cssText =
+          "border:1px dashed #7956ce88;background:#7956ce08;min-width:0;min-height:0;";
+        return cell;
+      }),
+    );
+  }
+  document.addEventListener("scroll", drawGrid, true);
+  window.addEventListener("resize", drawGrid);
   const active = new Map<
     string,
     {
@@ -301,6 +356,7 @@ function start(channel: string) {
       send(report);
       lastReport = serialized;
     }
+    drawGrid();
     observe();
   }
   function testAction(id: string) {
@@ -361,10 +417,12 @@ function start(channel: string) {
       snap = message.snap === true;
       if (freeMove !== (message.freeMove === true) && drag) cancelDrag();
       freeMove = message.freeMove === true;
+      showGrid = message.showGrid !== false;
       if (!editable && drag) cancelDrag();
       document.documentElement.dataset.tweakloomMode = simulate
         ? "preview"
         : "edit";
+      drawGrid();
     } else if (
       message.type === "nudge" &&
       editable &&
@@ -452,16 +510,40 @@ function start(channel: string) {
         !!el.dataset.tweakloomId &&
         getComputedStyle(el).position !== "absolute",
     );
-    const anchor = children.find((child) => {
-      const r = child.getBoundingClientRect();
-      if (horizontal)
-        return (
-          y < r.top ||
-          (y <= r.bottom &&
-            (reverse ? x > r.left + r.width / 2 : x < r.left + r.width / 2))
+    let anchor: HTMLElement | undefined;
+    if (horizontal) {
+      const rows: { top: number; bottom: number; children: HTMLElement[] }[] =
+        [];
+      for (const child of children) {
+        const r = child.getBoundingClientRect();
+        const row = rows.find(
+          (row) => r.top < row.bottom && r.bottom > row.top,
         );
-      return reverse ? y > r.top + r.height / 2 : y < r.top + r.height / 2;
-    });
+        if (row) {
+          row.top = Math.min(row.top, r.top);
+          row.bottom = Math.max(row.bottom, r.bottom);
+          row.children.push(child);
+        } else rows.push({ top: r.top, bottom: r.bottom, children: [child] });
+      }
+      rows.sort((a, b) => a.top - b.top);
+      const index = rows.findIndex(
+        (row, i) =>
+          y <= (rows[i + 1] ? (row.bottom + rows[i + 1].top) / 2 : row.bottom),
+      );
+      const row = rows[index];
+      if (row)
+        anchor =
+          row.children.find((child) => {
+            const r = child.getBoundingClientRect();
+            return reverse
+              ? x > r.left + r.width / 2
+              : x < r.left + r.width / 2;
+          }) ?? rows[index + 1]?.children[0];
+    } else
+      anchor = children.find((child) => {
+        const r = child.getBoundingClientRect();
+        return reverse ? y > r.top + r.height / 2 : y < r.top + r.height / 2;
+      });
     const rect = (
       anchor ??
       children.at(-1) ??
@@ -573,6 +655,34 @@ function start(channel: string) {
     }
   }
   document.addEventListener("pointercancel", cancelDrag, true);
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Escape") {
+        cancelDrag();
+        return;
+      }
+      if (
+        !initialized ||
+        !editable ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.altKey ||
+        (event.target instanceof Element &&
+          event.target.closest('input,textarea,[contenteditable="true"]'))
+      )
+        return;
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancelDrag();
+      send({
+        type: "history-request",
+        action: key === "y" || event.shiftKey ? "redo" : "undo",
+      });
+    },
+    true,
+  );
   document.addEventListener(
     "pointerup",
     (event) => {

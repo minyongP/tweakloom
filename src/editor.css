@@ -1063,3 +1063,43 @@ select:focus-visible {
   color: #7956ce;
   background: #fff;
 }
+.frame-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.frame-controls label {
+  min-width: 0;
+  font-size: 10px;
+  color: #827190;
+}
+.frame-controls select,
+.frame-controls input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  min-width: 0;
+  border: 1px solid #e4dcea;
+  border-radius: 5px;
+  padding: 7px;
+  color: #635270;
+  background: #fdfbff;
+  font: inherit;
+}
+.gap-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gap-control button {
+  padding: 5px;
+}
+.header-actions {
+  gap: 9px;
+}
+.canvas-toolbar {
+  height: auto;
+  min-height: 53px;
+  flex-wrap: wrap;
+}

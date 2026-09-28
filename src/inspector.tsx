@@ -15,6 +15,7 @@ export function Inspector({
   applyMany,
   freeMove,
   nudge,
+  selectParent,
 }: {
   element: ElementInfo;
   disabled: boolean;
@@ -22,8 +23,11 @@ export function Inspector({
   applyMany: (ops: Operation[]) => void;
   freeMove: boolean;
   nudge: (direction: "earlier" | "later") => void;
+  selectParent: () => void;
 }) {
   const editing = useRef(new Set<string>());
+  const isGrid = element.styles.display.includes("grid");
+  const distributionProperty = isGrid ? "justifyItems" : "justifyContent";
   const [text, setText] = useState(element.text);
   const [optionText, setOptionText] = useState(
     (element.options ?? []).join("\n"),
@@ -43,7 +47,8 @@ export function Inspector({
         : "#000000";
     }
     if (field.type === "px" || field.type === "signed-px")
-      return value === "auto" || (key === "lineHeight" && value === "normal")
+      return ["auto", "100%", "fit-content"].includes(value) ||
+        (key === "lineHeight" && value === "normal")
         ? value
         : String(Math.round((parseFloat(value) || 0) * 100) / 100);
     return value;
@@ -126,6 +131,11 @@ export function Inspector({
               Move later
             </button>
           </div>
+          {element.parentId && (
+            <button className="small-apply" onClick={selectParent}>
+              Edit parent layout
+            </button>
+          )}
           {element.styles.translate !== "none" && (
             <button
               className="small-apply"
@@ -230,6 +240,106 @@ export function Inspector({
               </button>
             ))}
           </div>
+          <div className="frame-controls">
+            {element.styles.display.includes("grid") && (
+              <label>
+                Columns
+                <select
+                  aria-label="Grid column count"
+                  value={Math.min(
+                    4,
+                    element.styles.gridTemplateColumns.split(" ").length,
+                  )}
+                  onChange={(e) =>
+                    style(
+                      "gridTemplateColumns",
+                      `repeat(${e.target.value}, minmax(0, 1fr))`,
+                    )
+                  }
+                >
+                  {[1, 2, 3, 4].map((n) => (
+                    <option key={n} value={n}>
+                      {n} {n === 1 ? "column" : "columns"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label>
+              Gap (px)
+              <div className="gap-control">
+                <input
+                  aria-label="Frame gap"
+                  type="number"
+                  min="0"
+                  max="9999"
+                  value={values.gap}
+                  onChange={(e) => {
+                    editing.current.add("gap");
+                    setValues({ ...values, gap: e.target.value });
+                  }}
+                />
+                <button
+                  aria-label="Apply frame gap"
+                  onClick={() => style("gap", `${values.gap}px`)}
+                >
+                  ↵
+                </button>
+              </div>
+            </label>
+            <label>
+              {isGrid || element.styles.flexDirection.startsWith("row")
+                ? "Vertical align"
+                : "Horizontal align"}
+              <select
+                aria-label="Frame alignment"
+                value={element.styles.alignItems}
+                onChange={(e) => style("alignItems", e.target.value)}
+              >
+                {!["flex-start", "center", "flex-end", "stretch"].includes(
+                  element.styles.alignItems,
+                ) && <option value={element.styles.alignItems}>Current</option>}
+                <option value="flex-start">Start</option>
+                <option value="center">Center</option>
+                <option value="flex-end">End</option>
+                <option value="stretch">Stretch</option>
+              </select>
+            </label>
+            <label>
+              {isGrid ? "Horizontal align" : "Distribute"}
+              <select
+                aria-label="Frame distribution"
+                value={element.styles[distributionProperty]}
+                onChange={(e) => style(distributionProperty, e.target.value)}
+              >
+                {![
+                  "flex-start",
+                  "center",
+                  "flex-end",
+                  "space-between",
+                  "space-around",
+                  "space-evenly",
+                  ...(isGrid ? ["stretch"] : []),
+                ].includes(element.styles[distributionProperty]) && (
+                  <option value={element.styles[distributionProperty]}>
+                    Current
+                  </option>
+                )}
+                <option value="flex-start">Start</option>
+                <option value="center">Center</option>
+                <option value="flex-end">End</option>
+                {isGrid ? (
+                  <option value="stretch">Stretch</option>
+                ) : (
+                  <>
+                    <option value="space-between">Space between</option>
+                    <option value="space-evenly">Even spacing</option>
+                    <option value="space-around">Space around</option>
+                  </>
+                )}
+              </select>
+            </label>
+          </div>
           <p className="field-hint">
             Spacing and alignment follow this frame. Drop at an edge to place
             beside a frame, or in its center to place inside.
@@ -237,6 +347,16 @@ export function Inspector({
           </p>
         </section>
       )}
+      <section className="property-section">
+        <h3>Component width</h3>
+        <div className="layout-buttons">
+          <button onClick={() => style("width", "fit-content")}>
+            Fit content
+          </button>
+          <button onClick={() => style("width", "100%")}>Fill width</button>
+          <button onClick={() => style("width", "auto")}>Auto</button>
+        </div>
+      </section>
       {element.leaf && (
         <section className="property-section">
           <h3>Content</h3>
@@ -311,7 +431,17 @@ export function Inspector({
         <section className="property-section" key={group}>
           <h3>{group}</h3>
           {Object.entries(styleFields)
-            .filter(([, field]) => field.group === group)
+            .filter(
+              ([key, field]) =>
+                field.group === group &&
+                ![
+                  "gridTemplateColumns",
+                  "justifyItems",
+                  "gap",
+                  "alignItems",
+                  "justifyContent",
+                ].includes(key),
+            )
             .map(([key, field]) => {
               const property = key as StyleProperty;
               const select = field.type === "select",
@@ -379,7 +509,9 @@ export function Inspector({
                           select ||
                             color ||
                             number ||
-                            ["auto", "normal"].includes(values[property])
+                            ["auto", "normal", "100%", "fit-content"].includes(
+                              values[property],
+                            )
                             ? values[property]
                             : `${values[property]}px`,
                         )

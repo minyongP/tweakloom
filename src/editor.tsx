@@ -21,6 +21,7 @@ import { Inspector, Actions } from "./inspector.tsx";
 import "./editor.css";
 
 const recoveryKey = "tweakloom:demo:unsaved";
+const historyKey = "tweakloom:demo:history";
 
 async function requestDraft(
   method: "GET" | "PUT",
@@ -55,12 +56,14 @@ function App() {
   const [elements, setElements] = useState<ElementInfo[]>([]);
   const [generation, setGeneration] = useState(0);
   const [history, setHistory] = useState<Operation[][]>([]);
+  const [future, setFuture] = useState<Operation[][]>([]);
   const [rightTab, setRightTab] = useState<"Design" | "Actions" | "Insert">(
     "Design",
   );
   const [simulate, setSimulate] = useState(false);
   const [snap, setSnap] = useState(false);
   const [freeMove, setFreeMove] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   const [simulation, setSimulation] = useState("");
   const pendingSelect = useRef<string | null>(null);
   const [channel] = useState(() => crypto.randomUUID());
@@ -95,11 +98,35 @@ function App() {
         }
       }
       if (!recover) sessionStorage.removeItem(recoveryKey);
+      let past: Operation[][] = [],
+        redo: Operation[][] = [];
+      if (recover)
+        try {
+          const cached = JSON.parse(
+            sessionStorage.getItem(historyKey) ?? "null",
+          );
+          if (cached?.current === JSON.stringify(restored.operations)) {
+            if (
+              ![cached.past, cached.future].every(
+                (stack) => Array.isArray(stack) && stack.length <= 50,
+              )
+            )
+              throw new Error("Invalid history");
+            for (const operations of [...cached.past, ...cached.future])
+              validateDraft({ ...emptyDraft(), operations });
+            past = cached.past;
+            redo = cached.future;
+          }
+        } catch {
+          warning ||=
+            "Undo history could not be recovered. Your draft is kept.";
+        }
       setDraft(restored);
       setSavedOperations(JSON.stringify(value.operations));
       setLoaded(true);
       setError(warning);
-      setHistory([]);
+      setHistory(past);
+      setFuture(redo);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -125,6 +152,7 @@ function App() {
           simulate,
           snap,
           freeMove,
+          showGrid,
         });
       }
       if (
@@ -148,6 +176,10 @@ function App() {
       }
       if (event.data.type === "edit" && !saving && !reloading)
         apply(event.data.operation);
+      if (event.data.type === "history-request") {
+        if (event.data.action === "undo") undo();
+        if (event.data.action === "redo") redo();
+      }
       if (event.data.type === "insert-request" && !saving && !reloading)
         insert(
           event.data.preset,
@@ -183,7 +215,19 @@ function App() {
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [channel, draft, saving, reloading, simulate, snap, freeMove, elements]);
+  }, [
+    channel,
+    draft,
+    saving,
+    reloading,
+    simulate,
+    snap,
+    freeMove,
+    showGrid,
+    elements,
+    history,
+    future,
+  ]);
   useEffect(() => {
     send({
       type: "settings",
@@ -191,20 +235,47 @@ function App() {
       simulate,
       snap,
       freeMove,
+      showGrid,
     });
-  }, [saving, reloading, simulate, snap, freeMove, connected]);
+  }, [saving, reloading, simulate, snap, freeMove, showGrid, connected]);
   useEffect(() => {
     if (!loaded) return;
     send({ type: "draft", draft });
     try {
       if (dirty) sessionStorage.setItem(recoveryKey, JSON.stringify(draft));
       else sessionStorage.removeItem(recoveryKey);
+      sessionStorage.setItem(
+        historyKey,
+        JSON.stringify({
+          current: JSON.stringify(draft.operations),
+          past: history,
+          future,
+        }),
+      );
     } catch {
       setError(
         "Browser recovery storage is unavailable. Save the draft before refreshing.",
       );
     }
-  }, [draft, loaded, dirty]);
+  }, [draft, loaded, dirty, history, future]);
+  useEffect(() => {
+    const keyboard = (event: KeyboardEvent) => {
+      if (
+        !(event.ctrlKey || event.metaKey) ||
+        event.altKey ||
+        (event.target instanceof Element &&
+          event.target.closest('input,textarea,[contenteditable="true"]'))
+      )
+        return;
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+      event.preventDefault();
+      if (key === "y" || event.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
+  }, [draft, history, future, saving, reloading, loaded]);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       if (dirty) event.preventDefault();
@@ -215,8 +286,26 @@ function App() {
 
   function change(operations: Operation[]) {
     validateDraft({ ...draft, operations });
+    if (JSON.stringify(operations) === JSON.stringify(draft.operations)) return;
     setHistory((prior) => [...prior.slice(-49), draft.operations]);
+    setFuture([]);
     setDraft({ ...draft, operations });
+  }
+  function undo() {
+    if (!loaded || saving || reloading || !history.length) return;
+    pendingSelect.current = null;
+    setFuture([...future.slice(-49), draft.operations]);
+    setDraft({ ...draft, operations: history.at(-1)! });
+    setHistory(history.slice(0, -1));
+    setError("");
+  }
+  function redo() {
+    if (!loaded || saving || reloading || !future.length) return;
+    pendingSelect.current = null;
+    setHistory([...history.slice(-49), draft.operations]);
+    setDraft({ ...draft, operations: future.at(-1)! });
+    setFuture(future.slice(0, -1));
+    setError("");
   }
   function apply(op: Operation) {
     applyMany([op]);
@@ -327,6 +416,22 @@ function App() {
           <span className="muted">/ visual draft</span>
         </div>
         <div className="header-actions">
+          <button
+            aria-label="Undo"
+            title="Undo (Ctrl/Cmd+Z)"
+            disabled={!history.length || saving || reloading}
+            onClick={undo}
+          >
+            ↶ Undo
+          </button>
+          <button
+            aria-label="Redo"
+            title="Redo (Ctrl/Cmd+Shift+Z)"
+            disabled={!future.length || saving || reloading}
+            onClick={redo}
+          >
+            ↷ Redo
+          </button>
           <span className="save-state" aria-live="polite">
             {saving
               ? "Saving…"
@@ -410,6 +515,14 @@ function App() {
               <span className="muted">Click to select · drag to move</span>
             </div>
             <div className="canvas-options">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showGrid}
+                  onChange={(e) => setShowGrid(e.target.checked)}
+                />
+                Grid guides
+              </label>
               <select
                 aria-label="Drag behavior"
                 value={freeMove ? "free" : "flow"}
@@ -545,6 +658,10 @@ function App() {
               nudge={(direction) =>
                 send({ type: "nudge", id: selected.id, direction })
               }
+              selectParent={() => {
+                if (selected.parentId)
+                  send({ type: "select", id: selected.parentId });
+              }}
             />
           ) : (
             <div className="empty-inspector">
@@ -562,15 +679,7 @@ function App() {
                 Draft changes{" "}
                 <span className="count">{draft.operations.length}</span>
               </h2>
-              <button
-                disabled={!history.length || saving || reloading}
-                onClick={() => {
-                  setDraft({ ...draft, operations: history.at(-1)! });
-                  setHistory(history.slice(0, -1));
-                }}
-              >
-                Undo
-              </button>
+              <span className="muted">{history.length} undo steps</span>
             </div>
             {!draft.operations.length && (
               <p className="muted">Your adjustments will appear here.</p>
