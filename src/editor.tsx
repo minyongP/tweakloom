@@ -1,0 +1,577 @@
+import { useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  emptyDraft,
+  operationKey,
+  upsertOperation,
+  validateDraft,
+} from "./shared/draft.ts";
+import type {
+  Draft,
+  ElementInfo,
+  Operation,
+  StyleProperty,
+} from "./shared/draft.ts";
+import "./editor.css";
+
+const recoveryKey = "tweakloom:demo:unsaved";
+
+async function requestDraft(
+  method: "GET" | "PUT",
+  draft?: Draft,
+): Promise<Draft> {
+  const response = await fetch("/api/draft", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tweakloom-Token": __DRAFT_TOKEN__,
+    },
+    ...(draft
+      ? { body: JSON.stringify({ expectedRevision: draft.revision, draft }) }
+      : {}),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? "Could not save draft");
+  validateDraft(result);
+  return result;
+}
+
+function App() {
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [savedOperations, setSavedOperations] = useState("[]");
+  const [loaded, setLoaded] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [error, setError] = useState("");
+  const [conflicts, setConflicts] = useState<string[]>([]);
+  const [selected, setSelected] = useState<ElementInfo | null>(null);
+  const [elements, setElements] = useState<ElementInfo[]>([]);
+  const [generation, setGeneration] = useState(0);
+  const [history, setHistory] = useState<Operation[][]>([]);
+  const [channel] = useState(() => crypto.randomUUID());
+  const iframe = useRef<HTMLIFrameElement>(null);
+  const latest = useRef(draft);
+  latest.current = draft;
+  const dirty = JSON.stringify(draft.operations) !== savedOperations;
+  const send = (message: object) =>
+    iframe.current?.contentWindow?.postMessage(
+      { channel, ...message },
+      location.origin,
+    );
+
+  async function load(recover = false) {
+    setReloading(true);
+    try {
+      const value = await requestDraft("GET");
+      let restored = value;
+      let warning = "";
+      const raw = recover ? sessionStorage.getItem(recoveryKey) : null;
+      if (raw) {
+        try {
+          const cached: unknown = JSON.parse(raw);
+          validateDraft(cached);
+          restored = cached;
+          if (cached.revision !== value.revision)
+            warning =
+              "Saved draft changed in another tab. Your recovered edits are kept; export them or reload the saved draft.";
+        } catch {
+          warning =
+            "Browser recovery data is invalid. The saved file was loaded.";
+        }
+      }
+      if (!recover) sessionStorage.removeItem(recoveryKey);
+      setDraft(restored);
+      setSavedOperations(JSON.stringify(value.operations));
+      setLoaded(true);
+      setError(warning);
+      setHistory([]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setReloading(false);
+    }
+  }
+  useEffect(() => {
+    void load(true);
+  }, []);
+  useEffect(() => {
+    function receive(event: MessageEvent) {
+      if (
+        event.origin !== location.origin ||
+        event.source !== iframe.current?.contentWindow ||
+        event.data?.channel !== channel
+      )
+        return;
+      if (event.data.type === "ready") {
+        send({ type: "draft", draft: latest.current });
+      }
+      if (
+        event.data.type === "state" &&
+        Array.isArray(event.data.elements) &&
+        Array.isArray(event.data.conflicts)
+      ) {
+        setConnected(true);
+        setElements(event.data.elements);
+        setSelected(event.data.selected);
+        setConflicts(event.data.conflicts);
+      }
+      if (event.data.type === "error" && typeof event.data.error === "string")
+        setError(event.data.error);
+    }
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, [channel]);
+  useEffect(() => {
+    if (!loaded) return;
+    send({ type: "draft", draft });
+    try {
+      if (dirty) sessionStorage.setItem(recoveryKey, JSON.stringify(draft));
+      else sessionStorage.removeItem(recoveryKey);
+    } catch {
+      setError(
+        "Browser recovery storage is unavailable. Save the draft before refreshing.",
+      );
+    }
+  }, [draft, loaded, dirty]);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (dirty) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  function change(operations: Operation[]) {
+    setHistory((prior) => [...prior.slice(-49), draft.operations]);
+    setDraft({ ...draft, operations });
+  }
+  function apply(op: Operation) {
+    try {
+      change(upsertOperation(draft.operations, op));
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      const result = await requestDraft("PUT", draft);
+      setDraft(result);
+      setSavedOperations(JSON.stringify(result.operations));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  function exportDraft() {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "tweakloom-draft.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="wordmark">
+          <span className="logo">t</span>tweakloom
+          <span className="stage">EARLY BUILD</span>
+        </div>
+        <div className="project-name">
+          <span className="project-icon">▧</span> Studio Supply{" "}
+          <span className="muted">/ visual draft</span>
+        </div>
+        <div className="header-actions">
+          <span className="save-state" aria-live="polite">
+            {saving
+              ? "Saving…"
+              : dirty
+                ? "Unsaved changes"
+                : loaded
+                  ? `Saved · revision ${draft.revision}`
+                  : "Loading draft…"}
+          </span>
+          <button
+            className="primary"
+            onClick={save}
+            disabled={!loaded || saving || reloading || !dirty}
+          >
+            Save draft
+          </button>
+        </div>
+      </header>
+      <div className="workspace">
+        <aside className="layers" aria-label="Elements">
+          <div className="panel-heading">
+            <span>PAGE ELEMENTS</span>
+            <span className="count">{elements.length}</span>
+          </div>
+          <div className="page-label">
+            ▧ <span>Home page</span>
+            <span className="muted">↗</span>
+          </div>
+          <div className="element-list">
+            {elements.map((el, index) => (
+              <button
+                key={`${el.id}-${index}`}
+                className={
+                  selected?.id === el.id ? "element active" : "element"
+                }
+                onClick={() => {
+                  setSelected(null);
+                  send({ type: "select", id: el.id });
+                }}
+                aria-pressed={selected?.id === el.id}
+              >
+                <span className="tag-icon">
+                  {el.tag.startsWith("h") ? "T" : el.leaf ? "≡" : "▣"}
+                </span>
+                <span>{el.id.replaceAll("-", " ")}</span>
+              </button>
+            ))}
+          </div>
+          <div className="sidebar-note">
+            <span className="tiny-label">YOUR CODE STAYS YOURS</span>
+            <p>
+              Make a draft here.
+              <br />
+              Your source stays untouched.
+            </p>
+            <span className="phase-label">Phase 1 · React demo</span>
+          </div>
+        </aside>
+        <main className="canvas-area">
+          <div className="canvas-toolbar">
+            <div>
+              <span className="mode-indicator">↖</span>
+              <strong>Edit draft</strong>
+              <span className="toolbar-divider" />
+              <span className="muted">Click an element to inspect</span>
+            </div>
+            <button
+              className="icon-button"
+              onClick={() => {
+                setConnected(false);
+                setSelected(null);
+                setGeneration((n) => n + 1);
+              }}
+            >
+              ↻ <span>Reload preview</span>
+            </button>
+          </div>
+          <div className="canvas-scroll">
+            <div className="canvas-label">
+              <span>HOME / DESKTOP</span>
+              <span>
+                React + Vite <span className="dot">●</span>
+              </span>
+            </div>
+            <div className="preview-shell">
+              <div className="browser-bar">
+                <span className="browser-dots">● ● ●</span>
+                <span>studio-supply.local /</span>
+                <span>↗</span>
+              </div>
+              {loaded && (
+                <iframe
+                  key={generation}
+                  ref={iframe}
+                  title="Editable frontend preview"
+                  src={`/demo.html#tweakloom=${channel}`}
+                  onLoad={() => send({ type: "draft", draft: latest.current })}
+                />
+              )}
+            </div>
+            <p className="canvas-hint">A real page. A safe place to explore.</p>
+          </div>
+          <div className="canvas-footer">
+            <span>
+              <i className={connected ? "status-dot online" : "status-dot"} />
+              {connected ? "Preview connected" : "Connecting preview…"}
+            </span>
+            <span>
+              {draft.operations.length} draft change
+              {draft.operations.length === 1 ? "" : "s"}
+              <span className="footer-separator">·</span>Source unchanged
+            </span>
+          </div>
+        </main>
+        <aside className="inspector" aria-label="Inspector">
+          <div className="panel-heading">
+            <span>INSPECTOR</span>
+            <span>⚙</span>
+          </div>
+          {selected ? (
+            <Inspector
+              key={selected.id}
+              element={selected}
+              disabled={saving || reloading}
+              apply={apply}
+            />
+          ) : (
+            <div className="empty-inspector">
+              <div className="cursor-glyph">↖</div>
+              <h2>Select something to start</h2>
+              <p>
+                Click the page or choose an element from the list. Then make it
+                yours.
+              </p>
+            </div>
+          )}
+          <section className="changes">
+            <div className="changes-heading">
+              <h2>
+                Draft changes{" "}
+                <span className="count">{draft.operations.length}</span>
+              </h2>
+              <button
+                disabled={!history.length || saving || reloading}
+                onClick={() => {
+                  setDraft({ ...draft, operations: history.at(-1)! });
+                  setHistory(history.slice(0, -1));
+                }}
+              >
+                Undo
+              </button>
+            </div>
+            {!draft.operations.length && (
+              <p className="muted">Your adjustments will appear here.</p>
+            )}
+            {draft.operations.map((op) => (
+              <div className="change" key={operationKey(op)}>
+                <span className="change-dot" />
+                <div>
+                  <strong>{op.targetId}</strong>
+                  <p>
+                    {op.kind === "text" ? "Text" : op.property} →{" "}
+                    {op.after || "(empty)"}
+                  </p>
+                </div>
+                <button
+                  aria-label={`Remove ${operationKey(op)}`}
+                  disabled={saving || reloading}
+                  onClick={() =>
+                    change(
+                      draft.operations.filter(
+                        (item) => operationKey(item) !== operationKey(op),
+                      ),
+                    )
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </section>
+          <div className="inspector-bottom">
+            <button
+              className="export-button"
+              onClick={exportDraft}
+              disabled={
+                !draft.operations.length || !!conflicts.length || !connected
+              }
+            >
+              Export draft JSON <span>↗</span>
+            </button>
+            <p>AI handoff is coming in a later phase.</p>
+            <button
+              className="text-button"
+              disabled={saving || reloading}
+              onClick={() => {
+                if (
+                  !dirty ||
+                  confirm("Discard unsaved edits and reload the saved draft?")
+                )
+                  void load();
+              }}
+            >
+              Reload saved draft
+            </button>
+          </div>
+        </aside>
+      </div>
+      {(error || conflicts.length > 0) && (
+        <div className="error-banner" role="alert">
+          <strong>
+            {error ? "Draft needs attention" : "Reconnect these changes"}
+          </strong>
+          <span>{error || conflicts.join(" · ")}</span>
+          <small>
+            Keep the draft. Remove the affected change or restore the original
+            app state before continuing.
+          </small>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Inspector({
+  element,
+  disabled,
+  apply,
+}: {
+  element: ElementInfo;
+  disabled: boolean;
+  apply: (op: Operation) => void;
+}) {
+  const [text, setText] = useState(element.text);
+  const editing = useRef(new Set<string>());
+  const hex = (value: string) => {
+    const parts = value.match(/\d+/g);
+    return parts?.length === 3
+      ? `#${parts.map((n) => Number(n).toString(16).padStart(2, "0")).join("")}`
+      : "#000000";
+  };
+  const [values, setValues] = useState<Record<StyleProperty, string>>({
+    color: hex(element.styles.color),
+    backgroundColor: hex(element.styles.backgroundColor),
+    padding: String(parseInt(element.styles.padding) || 0),
+    borderRadius: String(parseInt(element.styles.borderRadius) || 0),
+    fontSize: String(parseInt(element.styles.fontSize) || 16),
+    width: String(parseInt(element.styles.width) || 0),
+  });
+  useEffect(() => {
+    if (!editing.current.has("text")) setText(element.text);
+    setValues(
+      (current) =>
+        Object.fromEntries(
+          Object.entries(element.styles).map(([key, value]) => [
+            key,
+            editing.current.has(key)
+              ? current[key as StyleProperty]
+              : key === "color" || key === "backgroundColor"
+                ? hex(value)
+                : String(parseInt(value) || 0),
+          ]),
+        ) as Record<StyleProperty, string>,
+    );
+  }, [element]);
+  const labels: Record<StyleProperty, string> = {
+    color: "Text color",
+    backgroundColor: "Background",
+    padding: "Padding",
+    borderRadius: "Corner radius",
+    fontSize: "Font size",
+    width: "Width",
+  };
+  return (
+    <fieldset disabled={disabled} className="properties">
+      <div className="selected-element">
+        <span className="selected-tag">{element.tag}</span>
+        <div>
+          <h2>{element.id.replaceAll("-", " ")}</h2>
+          <span>Selected instance</span>
+        </div>
+      </div>
+      {element.leaf ? (
+        <section className="property-section">
+          <h3>Content</h3>
+          <label htmlFor="text-content">Text content</label>
+          <textarea
+            id="text-content"
+            value={text}
+            maxLength={2000}
+            onChange={(e) => {
+              editing.current.add("text");
+              setText(e.target.value);
+            }}
+            rows={3}
+          />
+          <button
+            className="small-apply"
+            onClick={() => {
+              editing.current.delete("text");
+              apply({
+                targetId: element.id,
+                tag: element.tag,
+                kind: "text",
+                before: element.baseline?.text ?? element.text,
+                after: text,
+              });
+            }}
+          >
+            Apply text
+          </button>
+        </section>
+      ) : (
+        <p className="nested-note">
+          Contains child elements. Select a text element to edit its content.
+        </p>
+      )}
+      <section className="property-section">
+        <h3>Appearance</h3>
+        {(
+          [
+            "color",
+            "backgroundColor",
+            "fontSize",
+            "padding",
+            "borderRadius",
+            "width",
+          ] as StyleProperty[]
+        ).map((property) => {
+          const isColor =
+            property === "color" || property === "backgroundColor";
+          return (
+            <div className="property" key={property}>
+              <label htmlFor={property}>
+                {labels[property]}
+                {!isColor && " (px)"}
+              </label>
+              <div className="property-control">
+                <input
+                  id={property}
+                  type={isColor ? "color" : "number"}
+                  min="0"
+                  max="9999"
+                  value={values[property]}
+                  onChange={(e) => {
+                    editing.current.add(property);
+                    setValues({ ...values, [property]: e.target.value });
+                  }}
+                />
+                {isColor && (
+                  <span className="hex-value">{values[property]}</span>
+                )}
+                <button
+                  aria-label={`Apply ${property}`}
+                  onClick={() => {
+                    editing.current.delete(property);
+                    apply({
+                      targetId: element.id,
+                      tag: element.tag,
+                      kind: "style",
+                      property,
+                      before:
+                        element.baseline?.styles[property] ??
+                        element.styles[property],
+                      after: isColor
+                        ? values[property]
+                        : `${values[property]}px`,
+                    });
+                  }}
+                >
+                  ↵
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+      <p className="viewport-note">
+        Changes describe this viewport. Responsive implementation comes later.
+      </p>
+    </fieldset>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(<App />);

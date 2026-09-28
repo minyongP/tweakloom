@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.tweakloom/
+test-results/
+playwright-report/
+*.local
+.env*
+!.env.example
