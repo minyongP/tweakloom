@@ -5,6 +5,7 @@ import {
   styleProperties,
   validateDraft,
   parseInteraction,
+  parseComponentRequest,
   parsePlacement,
 } from "./shared/draft.ts";
 import type {
@@ -49,8 +50,34 @@ function start(channel: string) {
   gridGuide.style.cssText =
     "display:none;position:fixed;pointer-events:none;z-index:2147483646;";
   document.documentElement.append(gridGuide);
+  const askButton = document.createElement("button");
+  askButton.textContent = "✦ Ask AI";
+  askButton.type = "button";
+  askButton.setAttribute("aria-label", "Ask AI about selected component");
+  askButton.dataset.tweakloomRequestButton = "";
+  askButton.style.cssText =
+    "display:none;position:fixed;z-index:2147483647;margin:0;padding:7px 10px;background:#7956ce;color:white;border:0;border-radius:5px;font:12px Arial,sans-serif;box-shadow:0 2px 8px #0002;";
+  askButton.addEventListener("click", () => {
+    if (selected) send({ type: "ask-request", id: selected });
+  });
+  document.documentElement.append(askButton);
   function drawGrid() {
     const chosen = selected ? candidates(selected)[0] : null;
+    askButton.style.display = "none";
+    if (chosen && !simulate && editable) {
+      const r = chosen.getBoundingClientRect();
+      if (
+        r.bottom > 0 &&
+        r.top < innerHeight &&
+        r.right > 0 &&
+        r.left < innerWidth
+      )
+        Object.assign(askButton.style, {
+          display: "block",
+          left: `${Math.max(4, Math.min(innerWidth - 90, r.right - 84))}px`,
+          top: `${Math.max(4, r.top - 34)}px`,
+        });
+    }
     const container = chosen?.hasAttribute("data-tweakloom-container")
       ? chosen
       : chosen?.parentElement?.closest<HTMLElement>(
@@ -273,12 +300,15 @@ function start(channel: string) {
       const el = matches[0];
       if (
         el.tagName.toLowerCase() !== op.tag ||
-        (op.kind === "text" && !info(el).leaf)
+        (op.kind === "text" && !info(el).leaf) ||
+        (op.kind === "request" &&
+          parseComponentRequest(op.after).intent === "create" &&
+          !info(el).container)
       ) {
         conflicts.push(`${op.targetId}: structure changed in the app`);
         continue;
       }
-      if (op.kind === "interaction") continue;
+      if (op.kind === "interaction" || op.kind === "request") continue;
       const baseline = baselines.get(el)!;
       const current =
         op.kind === "text"
@@ -566,6 +596,11 @@ function start(channel: string) {
     "click",
     (event) => {
       if (!initialized) return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-tweakloom-request-button]")
+      )
+        return;
       const el = elementAt(event.target);
       if (
         simulate &&
@@ -629,6 +664,7 @@ function start(channel: string) {
       if (!drag.moved && Math.hypot(dx, dy) < 4) return;
       if (!drag.moved) {
         drag.moved = true;
+        askButton.style.display = "none";
         observer.disconnect();
         drag.element.setPointerCapture(event.pointerId);
       }
@@ -743,6 +779,7 @@ function start(channel: string) {
     ) {
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
+      askButton.style.display = "none";
       if (!freeMove) findPlacement(event.clientX, event.clientY);
     }
   });

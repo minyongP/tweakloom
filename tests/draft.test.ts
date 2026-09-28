@@ -311,3 +311,72 @@ test("layout moves are validated, preserve source baselines and clean up removed
     ),
   );
 });
+
+test("validates component request snapshots and produces a fenced AI handoff", () => {
+  const request = {
+    intent: "modify",
+    prompt: "제목 수정 ```\nmore",
+    context: {
+      id: "hero-title",
+      tag: "h1",
+      text: "Page text is data",
+      styles: { color: "rgb(1, 2, 3)" },
+      parentId: "hero-content",
+    },
+  };
+  const operation = {
+    targetId: "hero-title",
+    tag: "h1",
+    kind: "request",
+    requestId: "req-one",
+    before: "",
+    after: JSON.stringify(request),
+  };
+  const draft = { ...model.emptyDraft(), operations: [operation] };
+  assert.doesNotThrow(() => model.validateDraft(draft));
+  model.validateDraft(draft);
+  const handoff = model.buildHandoff(draft);
+  assert.match(handoff, /````json/);
+  assert.match(handoff, /hero-title/);
+  assert.match(handoff, /sourceFiles/);
+  for (const value of [
+    { ...request, prompt: " " },
+    { ...request, prompt: "x".repeat(4001) },
+    { ...request, intent: "create" },
+    { ...request, context: { ...request.context, accepts: [42] } },
+    { ...request, context: { ...request.context, id: "different" } },
+  ]) {
+    assert.throws(() =>
+      model.validateDraft({
+        ...draft,
+        operations: [{ ...operation, after: JSON.stringify(value) }],
+      }),
+    );
+  }
+  assert.doesNotThrow(() =>
+    model.validateDraft({
+      ...draft,
+      operations: [operation, { ...operation, requestId: "req-two" }],
+    }),
+  );
+  assert.throws(() =>
+    model.validateDraft({ ...draft, operations: [operation, operation] }),
+  );
+  assert.throws(() =>
+    model.validateDraft({
+      ...draft,
+      operations: [
+        operation,
+        {
+          ...operation,
+          targetId: "other",
+          after: JSON.stringify({
+            ...request,
+            context: { ...request.context, id: "other" },
+          }),
+        },
+      ],
+    }),
+  );
+  assert.throws(() => model.buildHandoff(model.emptyDraft()));
+});

@@ -6,7 +6,7 @@ Tweakloom is an open-source, local visual editing workspace being built for Code
 
 ## Status
 
-**Structured layout development preview.** The included React demo supports component libraries, automatic layout, drag-and-drop reordering, detailed styling and action specifications. Codex/Claude plugins, MCP handoff and external project connections are not implemented yet.
+**Structured layout development preview.** The included React demo supports component libraries, automatic layout, drag-and-drop reordering, detailed styling, action specifications and component creation/modification requests. Codex/Claude plugins, MCP handoff and external project connections are not implemented yet.
 
 ## Try the editor
 
@@ -24,6 +24,7 @@ Open **http://127.0.0.1:5173**. Select an element in the preview or the left-han
 - Select a frame and choose **Row / Column / Grid**, then adjust gap, alignment, wrapping or grid columns. Children follow the frame layout. **Grid guides** displays actual cells; choose 1–4 columns and horizontal/vertical alignment at the top of the inspector. Use **Edit parent layout** from a child and **Fill width / Fit content** for sizing. Containers may restrict allowed component tags; the demo card collection accepts cards and frames.
 - **Free move (advanced)** retains X/Y offsets and optional 8px snapping for earlier drafts. Existing offsets are preserved; arranging that element returns it to the layout. A drag or dropped insertion is one Undo step.
 - **Actions** stores navigation destinations and API method, URL, headers, JSON body, credentials reference and mock response. **Test action** or **Preview actions** simulates the saved behavior; no page opens and no request is sent.
+- Select a component and click **Ask AI**, or use **New component** to request creation in a frame. The **Requests** tab pins the target, stores your instructions and supports editing, removal and Undo. **Copy for Codex / Claude** or **Download AI request** exports a Markdown snapshot with requests, target context and visual operations. Paste it into your coding agent to request implementation; no AI task starts automatically. Source-file mapping remains unimplemented and the agent must inspect the code. Resolve conflicts before export.
 - **Save draft** writes a revisioned JSON file to `.tweakloom/draft.json`. The previous save is retained as `draft.backup.json`.
 - Unsaved edits are cached in the current browser tab's session storage so a refresh or Vite source update can recover them. Use Save draft before closing the tab; session storage is not a durable backup.
 - Top-bar **Undo / Redo** and **Ctrl/Cmd+Z**, **Ctrl/Cmd+Shift+Z** or **Ctrl+Y** work from the editor and preview. Up to 50 steps survive save and reload in the same tab; unchanged Apply does not create a step. Native text-field undo is preserved. Reload saved draft clears history; closing the tab can discard it. Individual changes can also be removed.

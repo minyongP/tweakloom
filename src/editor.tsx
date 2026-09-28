@@ -18,6 +18,7 @@ import { presets } from "./shared/catalog.ts";
 import type { PresetId } from "./shared/catalog.ts";
 import { Library } from "./library.tsx";
 import { Inspector, Actions } from "./inspector.tsx";
+import { Requests } from "./requests.tsx";
 import "./editor.css";
 
 const recoveryKey = "tweakloom:demo:unsaved";
@@ -57,9 +58,13 @@ function App() {
   const [generation, setGeneration] = useState(0);
   const [history, setHistory] = useState<Operation[][]>([]);
   const [future, setFuture] = useState<Operation[][]>([]);
-  const [rightTab, setRightTab] = useState<"Design" | "Actions" | "Insert">(
-    "Design",
-  );
+  const [rightTab, setRightTab] = useState<
+    "Design" | "Actions" | "Insert" | "Requests"
+  >("Design");
+  const [requestStart, setRequestStart] = useState<{
+    element: ElementInfo;
+    intent: "create" | "modify";
+  } | null>(null);
   const [simulate, setSimulate] = useState(false);
   const [snap, setSnap] = useState(false);
   const [freeMove, setFreeMove] = useState(false);
@@ -176,6 +181,13 @@ function App() {
       }
       if (event.data.type === "edit" && !saving && !reloading)
         apply(event.data.operation);
+      if (event.data.type === "ask-request" && !saving && !reloading) {
+        const element = elements.find((el) => el.id === event.data.id);
+        if (element) {
+          setRequestStart({ element, intent: "modify" });
+          setRightTab("Requests");
+        }
+      }
       if (event.data.type === "history-request") {
         if (event.data.action === "undo") undo();
         if (event.data.action === "redo") redo();
@@ -290,6 +302,25 @@ function App() {
     setHistory((prior) => [...prior.slice(-49), draft.operations]);
     setFuture([]);
     setDraft({ ...draft, operations });
+  }
+  function startRequest(intent: "create" | "modify") {
+    const element =
+      intent === "modify"
+        ? selected
+        : elements.find(
+            (el) =>
+              el.id ===
+              (selected?.container
+                ? selected.id
+                : (selected?.parentId ?? "draft-board")),
+          );
+    if (!element) {
+      setError("Select a component on the page first.");
+      return;
+    }
+    setRequestStart({ element, intent });
+    setRightTab("Requests");
+    setError("");
   }
   function undo() {
     if (!loaded || saving || reloading || !history.length) return;
@@ -416,6 +447,13 @@ function App() {
           <span className="muted">/ visual draft</span>
         </div>
         <div className="header-actions">
+          <button
+            aria-label="New component request"
+            disabled={!connected || saving || reloading}
+            onClick={() => startRequest("create")}
+          >
+            ✦ New component
+          </button>
           <button
             aria-label="Undo"
             title="Undo (Ctrl/Cmd+Z)"
@@ -607,18 +645,53 @@ function App() {
             role="tablist"
             aria-label="Inspector sections"
           >
-            {(["Design", "Actions", "Insert"] as const).map((tab) => (
-              <button
-                key={tab}
-                role="tab"
-                aria-selected={rightTab === tab}
-                onClick={() => setRightTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
+            {(["Design", "Actions", "Insert", "Requests"] as const).map(
+              (tab) => (
+                <button
+                  key={tab}
+                  role="tab"
+                  aria-selected={rightTab === tab}
+                  onClick={() => {
+                    setRightTab(tab);
+                    if (tab === "Requests" && selected && !requestStart)
+                      startRequest("modify");
+                  }}
+                >
+                  {tab}
+                </button>
+              ),
+            )}
           </div>
-          {rightTab === "Insert" ? (
+          <div hidden={rightTab !== "Requests"}>
+            <Requests
+              draft={draft}
+              start={requestStart}
+              disabled={saving || reloading || !connected}
+              blocked={!!conflicts.length}
+              apply={(op) => {
+                try {
+                  if (
+                    !elements.some(
+                      (el) => el.id === op.targetId && el.tag === op.tag,
+                    )
+                  )
+                    throw new Error(
+                      "Request target is no longer available. Select it again.",
+                    );
+                  change(upsertOperation(draft.operations, op));
+                  setError("");
+                  return true;
+                } catch (e) {
+                  setError((e as Error).message);
+                  return false;
+                }
+              }}
+              remove={(op) => change(removeOperation(draft.operations, op))}
+              onNew={() => startRequest("create")}
+              onModify={() => startRequest("modify")}
+            />
+          </div>
+          {rightTab === "Requests" ? null : rightTab === "Insert" ? (
             <Library
               side="Right"
               channel={channel}
@@ -691,9 +764,11 @@ function App() {
                   <strong>{op.targetId}</strong>
                   <p>
                     {op.kind === "style" ? op.property : op.kind} →{" "}
-                    {op.kind === "interaction"
-                      ? "Click action"
-                      : op.after || "(empty)"}
+                    {op.kind === "request"
+                      ? "Component request"
+                      : op.kind === "interaction"
+                        ? "Click action"
+                        : op.after || "(empty)"}
                   </p>
                 </div>
                 <button
@@ -716,7 +791,7 @@ function App() {
             >
               Export draft JSON <span>↗</span>
             </button>
-            <p>AI handoff is coming in a later phase.</p>
+            <p>Use Requests to prepare a Codex / Claude handoff.</p>
             <button
               className="text-button"
               disabled={saving || reloading}
