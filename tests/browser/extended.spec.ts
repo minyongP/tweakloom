@@ -73,7 +73,7 @@ test("drags an existing component freely and keeps coordinates after reload", as
   page,
 }) => {
   await page.goto("/");
-  await page.getByLabel("드래그 방식").selectOption("free");
+  await expect(page.getByLabel("드래그 방식")).toHaveValue("free");
   const title = page
     .frameLocator("iframe")
     .getByRole("heading", { name: "Make room for good work." });
@@ -81,11 +81,24 @@ test("drags an existing component freely and keeps coordinates after reload", as
   const box = (await title.boundingBox())!;
   await page.mouse.move(box.x + 40, box.y + 20);
   await page.mouse.down();
-  await page.mouse.move(box.x + 104, box.y + 52, { steps: 8 });
+  await page.mouse.move(box.x + 107, box.y + 55, { steps: 8 });
   await page.mouse.up();
-  await expect(title).toHaveCSS("translate", "64px 32px");
-  await expect(page.getByLabel("X 위치")).toHaveValue("64");
+  await expect(title).toHaveCSS("translate", "67px 35px");
+  await expect(page.getByLabel("X 위치")).toHaveValue("67");
+  await expect(page.getByLabel("8px 격자", { exact: true })).not.toBeChecked();
+  await expect(
+    page.frameLocator("iframe").getByLabel("그리드 가이드", { exact: true }),
+  ).not.toBeVisible();
   await page.getByRole("button", { name: "되돌리기", exact: true }).click();
+  await expect(title).toHaveCSS("translate", "none");
+  await title.click();
+  await page.keyboard.press("ArrowRight");
+  await expect(title).toHaveCSS("translate", "1px");
+  await page.keyboard.press("Shift+ArrowDown");
+  await expect(title).toHaveCSS("translate", "1px 10px");
+  await page.keyboard.press("Control+z");
+  await expect(title).toHaveCSS("translate", "1px");
+  await page.keyboard.press("Control+z");
   await expect(title).toHaveCSS("translate", "none");
   await page.getByLabel("8px 격자", { exact: true }).check();
   await title.scrollIntoViewIfNeeded();
@@ -114,7 +127,7 @@ test("drags a component from the right library into the preview", async ({
   await page.getByLabel("드래그 방식").selectOption("free");
   const target = page
     .frameLocator("iframe")
-    .locator('[data-tweakloom-id="draft-board"]');
+    .locator('[data-tweakloom-id="hero-art"]');
   await target.scrollIntoViewIfNeeded();
   const source = await page
     .getByLabel("오른쪽 컴포넌트 목록")
@@ -127,17 +140,18 @@ test("drags a component from the right library into the preview", async ({
   await page.mouse.move(box.x + 70, box.y + 60, { steps: 15 });
   await page.mouse.up();
   await expect(
-    target.locator('[data-tweakloom-preset="button"]'),
+    page.frameLocator("iframe").locator('[data-tweakloom-preset="button"]'),
   ).toBeVisible();
-  const placed = (await target
+  const placed = (await page
+    .frameLocator("iframe")
     .locator('[data-tweakloom-preset="button"]')
     .boundingBox())!;
   expect(Math.abs(placed.x - box.x - 70)).toBeLessThan(2);
   expect(Math.abs(placed.y - box.y - 60)).toBeLessThan(2);
   await page.getByRole("button", { name: "되돌리기", exact: true }).click();
-  await expect(target.locator('[data-tweakloom-preset="button"]')).toHaveCount(
-    0,
-  );
+  await expect(
+    page.frameLocator("iframe").locator('[data-tweakloom-preset="button"]'),
+  ).toHaveCount(0);
 });
 
 test("configures page and API actions without navigation or outgoing requests", async ({

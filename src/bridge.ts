@@ -27,8 +27,8 @@ function start(channel: string) {
     pending = false,
     editable = true,
     simulate = false,
-    freeMove = false,
-    showGrid = true,
+    freeMove = true,
+    showGrid = false,
     snap = false;
   let lastReport = "",
     suppressClickUntil = 0;
@@ -701,7 +701,7 @@ function start(channel: string) {
       const position = getComputedStyle(el)
         .translate.split(" ")
         .map((v) => parseFloat(v) || 0);
-      // Legacy free-move drafts retain their visual offsets.
+      // Free dragging preserves the page layout and stores visual offsets.
       drag = {
         element: el,
         pointer: event.pointerId,
@@ -758,6 +758,59 @@ function start(channel: string) {
     (event) => {
       if (event.key === "Escape") {
         cancelDrag();
+        return;
+      }
+      if (
+        initialized &&
+        editable &&
+        freeMove &&
+        !simulate &&
+        !drag &&
+        selected &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
+          event.key,
+        ) &&
+        !(
+          event.target instanceof Element &&
+          event.target.closest('input,textarea,select,[contenteditable="true"]')
+        )
+      ) {
+        const el = candidates(selected)[0];
+        if (!el) return;
+        event.preventDefault();
+        const [x = 0, y = 0] = getComputedStyle(el)
+          .translate.split(" ")
+          .map((v) => parseFloat(v) || 0);
+        const step = event.shiftKey ? 10 : 1;
+        const dx =
+          event.key === "ArrowRight"
+            ? step
+            : event.key === "ArrowLeft"
+              ? -step
+              : 0;
+        const dy =
+          event.key === "ArrowDown"
+            ? step
+            : event.key === "ArrowUp"
+              ? -step
+              : 0;
+        const clamp = (n: number) => Math.max(-9999, Math.min(9999, n));
+        send({
+          type: "edit",
+          operation: {
+            targetId: selected,
+            tag: el.tagName.toLowerCase(),
+            kind: "style",
+            property: "translate",
+            before:
+              baselines.get(el)?.styles.translate ??
+              getComputedStyle(el).translate,
+            after: `${clamp(x + dx)}px ${clamp(y + dy)}px`,
+          },
+        });
         return;
       }
       if (
@@ -882,9 +935,9 @@ function start(channel: string) {
         return;
       }
       const container =
-        event.target instanceof Element
+        (event.target instanceof Element
           ? event.target.closest<HTMLElement>("[data-tweakloom-container]")
-          : null;
+          : null) ?? candidates("draft-board")[0];
       if (!container) {
         send({ type: "error", error: "프레임이나 편집 보드에 놓으세요." });
         return;

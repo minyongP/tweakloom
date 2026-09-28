@@ -7,6 +7,8 @@ test("drops into an empty grid cell, moves independently, spans cells and restor
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await expect(
     page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
@@ -94,6 +96,8 @@ test("inserts a free grid preset without changing the parent layout", async ({
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await expect(
     page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();

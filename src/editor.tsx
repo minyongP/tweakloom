@@ -73,8 +73,8 @@ function App() {
   } | null>(null);
   const [simulate, setSimulate] = useState(false);
   const [snap, setSnap] = useState(false);
-  const [freeMove, setFreeMove] = useState(false);
-  const [showGrid, setShowGrid] = useState(true);
+  const [freeMove, setFreeMove] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
   const [simulation, setSimulation] = useState("");
   const pendingSelect = useRef<string | null>(null);
   const [channel] = useState(() => crypto.randomUUID());
@@ -163,7 +163,7 @@ function App() {
           simulate,
           snap,
           freeMove,
-          showGrid,
+          showGrid: showGrid && !freeMove,
         });
       }
       if (
@@ -254,7 +254,7 @@ function App() {
       simulate,
       snap,
       freeMove,
-      showGrid,
+      showGrid: showGrid && !freeMove,
     });
   }, [saving, reloading, simulate, snap, freeMove, showGrid, connected]);
   useEffect(() => {
@@ -540,6 +540,7 @@ function App() {
             <span className="count">{presets.length}</span>
           </div>
           <Library
+            freeMove={freeMove}
             side="Left"
             channel={channel}
             disabled={!connected || saving || reloading || simulate}
@@ -600,21 +601,23 @@ function App() {
               <span className="muted">클릭으로 선택 · 드래그로 이동</span>
             </div>
             <div className="canvas-options">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={showGrid}
-                  onChange={(e) => setShowGrid(e.target.checked)}
-                />
-                그리드 가이드
-              </label>
+              {!freeMove && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) => setShowGrid(e.target.checked)}
+                  />
+                  그리드 가이드
+                </label>
+              )}
               <select
                 aria-label="드래그 방식"
                 value={freeMove ? "free" : "flow"}
                 onChange={(e) => setFreeMove(e.target.value === "free")}
               >
                 <option value="flow">자동 배치로 이동</option>
-                <option value="free">자유 이동 (고급)</option>
+                <option value="free">자유 이동</option>
               </select>
               {freeMove && (
                 <label>
@@ -737,6 +740,7 @@ function App() {
           </div>
           {rightTab === "요청" ? null : rightTab === "추가" ? (
             <Library
+              freeMove={freeMove}
               side="Right"
               channel={channel}
               disabled={!connected || saving || reloading || simulate}

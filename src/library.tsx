@@ -4,11 +4,13 @@ import type { PresetId } from "./shared/catalog.ts";
 
 export function Library({
   side,
+  freeMove,
   channel,
   disabled,
   insert,
 }: {
   side: "Left" | "Right";
+  freeMove: boolean;
   channel: string;
   disabled: boolean;
   insert: (preset: PresetId) => void;
@@ -32,7 +34,9 @@ export function Library({
         />
       </label>
       <p className="library-hint">
-        컴포넌트 사이에 놓으면 간격에 맞춰 배치됩니다.
+        {freeMove
+          ? "원하는 위치로 드래그해 놓으세요. 격자에 맞추지 않습니다."
+          : "컴포넌트 사이에 놓으면 간격에 맞춰 배치됩니다."}
       </p>
       {["입력 요소", "콘텐츠", "레이아웃"].map((group) => (
         <div className="library-group" key={group}>

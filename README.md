@@ -6,7 +6,7 @@ Tweakloom is an open-source, local visual editing workspace being built for Code
 
 ## Status
 
-**Structured layout development preview.** The included React demo supports component libraries, automatic layout, drag-and-drop reordering, detailed styling, action specifications and component creation/modification requests. Codex/Claude plugins, MCP handoff and external project connections are not implemented yet.
+**Visual editing development preview.** The included React demo supports component libraries, automatic layout, drag-and-drop reordering, detailed styling, action specifications and component creation/modification requests. Codex/Claude plugins, MCP handoff and external project connections are not implemented yet.
 
 The editor interface, accessibility labels, validation messages and AI request handoff are in Korean. CSS values and draft keys stay unchanged for existing drafts. The sample storefront keeps its original content.
 
@@ -22,10 +22,11 @@ npm run dev
 Open **http://127.0.0.1:5173**. Select an element in the preview or the left-hand list. Use the Design tab to adjust typography, colors, borders, dimensions, spacing, text alignment and flex layout, then use its Apply button. These edits affect the preview only, not project source files.
 
 - Browse searchable component previews on the left or under **Insert** on the right: button, dropdown, input, heading, paragraph, divider, card, frame (column), row and grid. Click to add to the selected container, or drag into a frame / Draft board at the desired position.
-- **Arrange components** is the default: drag between components to insert or reorder; drop in the center of a frame to move inside it. A purple guide shows the insertion point. Frame edges target the parent layout. **Move earlier/later** also supports keyboard-driven reordering.
+- **Free move / 자유 이동** is the default, with grid guides and snapping off. Drag selected elements to any visual offset, or use X/Y controls. In the preview, arrow keys move 1px and Shift+arrow moves 10px; editable fields keep native keyboard behavior. Library drops outside a marked frame use the draft board as their parent and place the component at the drop point. Movement remains a visual offset from the source layout.
+- Choose **Arrange components / 자동 배치로 이동** when structured placement is needed: drag between components to insert or reorder; drop in the center of a frame to move inside it. A purple guide shows the insertion point. Frame edges target the parent layout. **Move earlier/later** also supports keyboard-driven reordering.
 - Select a frame and choose **Row / Column / Grid**, then adjust gap, alignment, wrapping or grid columns. Children follow the frame layout. **Grid guides** displays actual cells; choose 1–4 columns and horizontal/vertical alignment at the top of the inspector. Use **Edit parent layout** from a child and **Fill width / Fit content** for sizing. Containers may restrict allowed component tags; the demo card collection accepts cards and frames.
 - **자유 그리드** adds a frame with 12 columns and 8 rows (64px each). Select an existing frame and choose **자유 그리드로 전환**, then drag components into empty cells. Use **시작 행 / 시작 열 / 차지할 행·열 수** for explicit CSS Grid placement. Column counts support 1–4, 6, 8 and 12; rows offer 4, 8 or 12 with implicit rows up to the supported 40-row editing range. Moving a component preserves spans; reducing columns fits children within the new count. Overlapping placements are allowed. **너비 채우기** fills the assigned columns. Save, Undo and Redo include placement changes.
-- **Free move (advanced)** retains X/Y offsets and optional 8px snapping for earlier drafts. Existing offsets are preserved; arranging that element returns it to the layout. A drag or dropped insertion is one Undo step.
+- Optional **8px 격자** enables snapping in free movement. Existing offsets are preserved; arranging that element returns it to the layout. A drag or dropped insertion is one Undo step.
 - **Actions** stores navigation destinations and API method, URL, headers, JSON body, credentials reference and mock response. **Test action** or **Preview actions** simulates the saved behavior; no page opens and no request is sent.
 - Select a component and click **Ask AI**, or use **New component** to request creation in a frame. The **Requests** tab pins the target, stores your instructions and supports editing, removal and Undo. **Copy for Codex / Claude** or **Download AI request** exports a Markdown snapshot with requests, target context and visual operations. Paste it into your coding agent to request implementation; no AI task starts automatically. Source-file mapping remains unimplemented and the agent must inspect the code. Resolve conflicts before export.
 - **Save draft** writes a revisioned JSON file to `.tweakloom/draft.json`. The previous save is retained as `draft.backup.json`.
@@ -84,4 +85,4 @@ A shared local web editor with a proposed MCP bridge and tool-specific plugin pa
 
 See the [design document (Korean)](docs/design.md) for the proposed architecture, editing scope, AI handoff contract, and acceptance criteria. This is a review draft, not an implemented feature list.
 
-See the [Phase 1 implementation record](docs/implementation/phase-1.md) and [Phase 2 implementation record](docs/implementation/phase-2.md) for implementation and verification scope. See [structured layout editing](docs/implementation/layout-editing.md) for the current default behavior.
+See the [Phase 1 implementation record](docs/implementation/phase-1.md) and [Phase 2 implementation record](docs/implementation/phase-2.md) for implementation and verification scope. See [structured layout editing](docs/implementation/layout-editing.md) for structured layout behavior.

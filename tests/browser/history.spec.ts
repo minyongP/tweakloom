@@ -8,6 +8,8 @@ test("undo works from preview keyboard focus, redo works, and history survives s
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await expect(
     page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
@@ -38,6 +40,8 @@ test("undo works from preview keyboard focus, redo works, and history survives s
 
 test("duplicate Apply does not consume an undo step", async ({ page }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   const title = page
     .frameLocator("iframe")
     .locator('[data-tweakloom-id="hero-title"]');
@@ -53,6 +57,8 @@ test("grid columns have visible guides, parent controls and undoable fill sizing
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await expect(
     page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
@@ -104,6 +110,8 @@ test("row drop position follows horizontal order above vertically centered items
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await expect(
     page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();

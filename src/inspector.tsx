@@ -221,11 +221,12 @@ export function Inspector({
             </button>
           </div>
           <p className="field-hint">
-            화면에서 드래그하거나 원래 위치 기준 이동 거리를 입력하세요.
+            격자 없이 드래그하세요. 미리보기에서 방향키는 1px, Shift+방향키는
+            10px 이동합니다. X·Y는 원래 위치 기준 이동 거리입니다.
           </p>
         </section>
       )}
-      {element.container && (
+      {element.container && !freeMove && (
         <section className="property-section">
           <h3>내부 요소 배치</h3>
           <button
@@ -479,11 +480,11 @@ export function Inspector({
         </section>
       )}
       {[
-        ...(element.parentGrid ? ["그리드 위치"] : []),
+        ...(!freeMove && element.parentGrid ? ["그리드 위치"] : []),
         "글꼴",
         "모양",
         "크기와 여백",
-        ...(element.container ? ["자동 배치"] : []),
+        ...(!freeMove && element.container ? ["자동 배치"] : []),
       ].map((group) => (
         <section className="property-section" key={group}>
           <h3>{group}</h3>

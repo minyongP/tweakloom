@@ -8,6 +8,8 @@ test("auto layout inserts without offsets, reorders, wraps and restores after sa
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await expect(
     page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
@@ -54,6 +56,8 @@ test("moves source siblings by dragging and restores exact order on Undo", async
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   const preview = page.frameLocator("iframe");
   const title = preview.locator('[data-tweakloom-id="hero-title"]');
   const target = preview.locator('[data-tweakloom-id="eyebrow"]');
@@ -84,6 +88,8 @@ test("container rules reject controls in a card collection", async ({
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await page.getByRole("button", { name: /카드 목록/ }).click();
   await page
     .getByLabel("왼쪽 컴포넌트 목록")
@@ -99,6 +105,8 @@ test("drops new components into flow and moves them into a frame without losing 
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   await expect(
     page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
@@ -163,6 +171,8 @@ test("moving a source element into a draft frame survives reload and frame remov
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await page.getByLabel("드래그 방식").selectOption("flow");
+  await page.getByLabel("그리드 가이드", { exact: true }).check();
   const preview = page.frameLocator("iframe"),
     title = preview.locator('[data-tweakloom-id="hero-title"]');
   await title.click();
