@@ -439,3 +439,30 @@ test("grid cells are validated and movement preserves spans but clears placement
   );
   model.validateDraft({ ...draft, operations: moved });
 });
+
+test("validates position-preserving parent changes", () => {
+  const value = {
+    parentId: "page-root",
+    beforeId: null,
+    floating: { left: 23, top: 41, width: 200, height: 120 },
+  };
+  assert.deepEqual(model.parsePlacement(JSON.stringify(value)), value);
+  for (const floating of [
+    { ...value.floating, left: NaN },
+    { ...value.floating, width: 0 },
+    { ...value.floating, top: 10000 },
+  ])
+    assert.throws(() =>
+      model.parsePlacement(JSON.stringify({ ...value, floating })),
+    );
+  const moved = model.moveOperations(
+    [],
+    { id: "hero-art", tag: "div", parentId: "hero-content" },
+    value,
+  );
+  assert.equal(
+    model.parsePlacement(moved.find((op) => op.kind === "move")!.after)
+      .parentId,
+    "page-root",
+  );
+});

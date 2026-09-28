@@ -14,15 +14,11 @@ import type {
   Operation,
   Placement,
 } from "./shared/draft.ts";
-import {
-  presets,
-  styleFields,
-  optionLabels,
-  elementLabels,
-} from "./shared/catalog.ts";
+import { presets, styleFields, optionLabels } from "./shared/catalog.ts";
 import type { PresetId } from "./shared/catalog.ts";
 import { Library } from "./library.tsx";
 import { Inspector, Actions } from "./inspector.tsx";
+import { Layers } from "./layers.tsx";
 import { Requests } from "./requests.tsx";
 import "./editor.css";
 
@@ -548,34 +544,22 @@ function App() {
           />
           <div className="panel-heading">
             <span>페이지 요소</span>
-            <span className="count">{elements.length}</span>
+            <span className="count">
+              {elements.filter((el) => el.id !== "page-root").length}
+            </span>
           </div>
-          <div className="page-label">
-            ▧ <span>홈 페이지</span>
-            <span className="muted">↗</span>
-          </div>
-          <div className="element-list">
-            {elements.map((el, index) => (
-              <button
-                key={`${el.id}-${index}`}
-                className={
-                  selected?.id === el.id ? "element active" : "element"
-                }
-                onClick={() => {
-                  setSelected(null);
-                  send({ type: "select", id: el.id });
-                }}
-                aria-pressed={selected?.id === el.id}
-              >
-                <span className="tag-icon">
-                  {el.tag.startsWith("h") ? "T" : el.leaf ? "≡" : "▣"}
-                </span>
-                <span>
-                  {elementLabels[el.id] ?? el.id.replaceAll("-", " ")}
-                </span>
-              </button>
-            ))}
-          </div>
+          <Layers
+            elements={elements}
+            selected={selected}
+            disabled={!connected || saving || reloading || simulate}
+            select={(id) => {
+              setSelected(null);
+              send({ type: "select", id });
+            }}
+            reparent={(id, parentId) =>
+              send({ type: "reparent", id, parentId })
+            }
+          />
           <div className="sidebar-note">
             <span className="tiny-label">원본 코드 보존</span>
             <p>

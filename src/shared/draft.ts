@@ -138,6 +138,7 @@ export type Placement = {
   parentId: string;
   beforeId: string | null;
   cell?: { column: number; row: number };
+  floating?: { left: number; top: number; width: number; height: number };
 };
 export function parsePlacement(raw: string): Placement {
   const value = JSON.parse(raw);
@@ -160,6 +161,20 @@ export function parsePlacement(raw: string): Placement {
       value.cell.row > 40)
   )
     throw new Error("그리드 위치가 범위를 벗어났습니다.");
+  if (
+    value.floating !== undefined &&
+    (!value.floating ||
+      value.cell ||
+      !["left", "top", "width", "height"].every(
+        (key) =>
+          typeof value.floating[key] === "number" &&
+          Number.isFinite(value.floating[key]) &&
+          Math.abs(value.floating[key]) <= 9999,
+      ) ||
+      value.floating.width <= 0 ||
+      value.floating.height <= 0)
+  )
+    throw new Error("소속 변경 위치가 올바르지 않습니다.");
   return value;
 }
 const px = /^(0|[1-9]\d{0,3})(\.\d{1,2})?px$/;

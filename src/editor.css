@@ -670,7 +670,7 @@ textarea {
   flex-shrink: 0;
 }
 .layers > .component-library {
-  max-height: 46vh;
+  max-height: 32vh;
 }
 .library-search {
   display: flex;
@@ -1225,4 +1225,60 @@ select:focus-visible {
 .simulation-note {
   word-break: keep-all;
   overflow-wrap: anywhere;
+}
+.layer-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.layer-row .element {
+  min-width: 0;
+  padding-left: 4px;
+}
+.layer-row .element span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.layer-toggle,
+.layer-spacer {
+  width: 16px;
+  flex: 0 0 16px;
+}
+.layer-toggle {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #887799;
+}
+.layer-parent {
+  border: 0;
+  border-top: 1px solid #eee;
+  padding: 12px;
+  margin: 0;
+  min-width: 0;
+}
+.layer-parent label {
+  display: block;
+  margin-bottom: 6px;
+}
+.layer-parent select {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid #e7e0ee;
+  border-radius: 5px;
+}
+.layer-parent button {
+  margin-top: 8px;
+}
+.layer-parent p {
+  font-size: 10px;
+  line-height: 1.5;
+  color: #887799;
+  word-break: keep-all;
+}
+.page-label small {
+  margin-left: auto;
+  font-size: 9px;
+  color: #887799;
 }

@@ -213,6 +213,7 @@ export const optionLabels: Record<string, string> = {
 };
 
 export const elementLabels: Record<string, string> = {
+  "page-root": "페이지 최상위",
   brand: "브랜드",
   "shop-link": "쇼핑 링크",
   "hero-content": "메인 영역",

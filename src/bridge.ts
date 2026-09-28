@@ -21,6 +21,12 @@ if (channel && /^[a-f0-9-]{36}$/.test(channel) && window.parent !== window)
   start(channel);
 
 function start(channel: string) {
+  const pageRoot = document.createElement("div");
+  pageRoot.dataset.tweakloomId = "page-root";
+  pageRoot.dataset.tweakloomContainer = "";
+  pageRoot.style.cssText =
+    "position:absolute;left:0;top:0;width:100%;height:0;pointer-events:none;";
+  document.body.append(pageRoot);
   let draft: Draft = emptyDraft();
   let selected: string | null = null;
   let initialized = false,
@@ -38,6 +44,11 @@ function start(channel: string) {
     parent: Node;
     next: Node | null;
     appliedParent: Node;
+    styles: {
+      property: "position" | "left" | "top" | "width" | "height" | "boxSizing";
+      original: string;
+      applied: string;
+    }[];
   }[] = [];
   // Outside the observed app subtree so drawing the guide never triggers replay.
   const guide = document.createElement("div");
@@ -182,9 +193,9 @@ function start(channel: string) {
       el.children.length === 0 &&
       !["input", "hr", "select"].includes(el.tagName.toLowerCase()),
     container: el.hasAttribute("data-tweakloom-container"),
-    parentId: el.parentElement?.closest<HTMLElement>(
-      "[data-tweakloom-container]",
-    )?.dataset.tweakloomId,
+    parentId:
+      el.parentElement?.closest<HTMLElement>("[data-tweakloom-container]")
+        ?.dataset.tweakloomId ?? (el === pageRoot ? undefined : "page-root"),
     parentGrid:
       !!el.parentElement &&
       getComputedStyle(el.parentElement).display.includes("grid"),
@@ -229,6 +240,9 @@ function start(channel: string) {
         write(previous.element, previous.operation, previous.original);
     active.clear();
     for (const item of moved.reverse()) {
+      for (const { property, original, applied } of item.styles)
+        if (item.element.style[property] === applied)
+          item.element.style[property] = original;
       if (
         item.element.parentNode === item.appliedParent &&
         item.parent.isConnected
@@ -361,13 +375,41 @@ function start(channel: string) {
         );
         continue;
       }
+      const owned: (typeof moved)[number]["styles"] = [];
       moved.push({
+        styles: owned,
         element: el,
         parent: el.parentNode!,
         next: el.nextSibling,
         appliedParent: container,
       });
       container.insertBefore(el, anchor);
+      if (placement.floating) {
+        const f = placement.floating;
+        const styles = {
+          position: "absolute",
+          left: `${f.left}px`,
+          top: `${f.top}px`,
+          width: `${f.width}px`,
+          height: `${f.height}px`,
+          boxSizing: "border-box",
+        } as const;
+        for (const property of Object.keys(styles) as (keyof typeof styles)[]) {
+          if (
+            (property === "width" || property === "height") &&
+            draft.operations.some(
+              (op) =>
+                op.targetId === el.dataset.tweakloomId &&
+                op.kind === "style" &&
+                op.property === property,
+            )
+          )
+            continue;
+          const original = el.style[property];
+          el.style[property] = styles[property];
+          owned.push({ property, original, applied: el.style[property] });
+        }
+      }
     }
     for (const el of document.querySelectorAll("[data-tweakloom-selected]"))
       el.removeAttribute("data-tweakloom-selected");
@@ -448,6 +490,62 @@ function start(channel: string) {
       candidates(message.id)[0]?.scrollIntoView({
         block: "nearest",
         inline: "nearest",
+      });
+    } else if (message.type === "reparent" && editable && !simulate && !drag) {
+      const el = candidates(message.id)[0],
+        container = candidates(message.parentId)[0];
+      if (
+        !el ||
+        el === pageRoot ||
+        !container ||
+        !container.hasAttribute("data-tweakloom-container") ||
+        el.contains(container) ||
+        !accepts(container, el.tagName.toLowerCase())
+      ) {
+        send({
+          type: "error",
+          error:
+            "이 영역으로 옮길 수 없습니다. 소속 관계와 허용 컴포넌트를 확인하세요.",
+        });
+        return;
+      }
+      const scrollBefore = { x: scrollX, y: scrollY };
+      const rect = el.getBoundingClientRect(),
+        parent = el.parentNode!,
+        next = el.nextSibling,
+        original = el.getAttribute("style");
+      observer.disconnect();
+      let floating;
+      try {
+        Object.assign(el.style, {
+          position: "absolute",
+          left: "0px",
+          top: "0px",
+          translate: "none",
+          width: rect.width + "px",
+          height: rect.height + "px",
+          boxSizing: "border-box",
+        });
+        container.append(el);
+        const origin = el.getBoundingClientRect();
+        const round = (n: number) => Math.round(n * 100) / 100;
+        floating = {
+          left: round(rect.left + scrollBefore.x - origin.left - scrollX),
+          top: round(rect.top + scrollBefore.y - origin.top - scrollY),
+          width: round(rect.width),
+          height: round(rect.height),
+        };
+      } finally {
+        parent.insertBefore(el, next);
+        if (original === null) el.removeAttribute("style");
+        else el.setAttribute("style", original);
+        window.scrollTo(scrollBefore.x, scrollBefore.y);
+        observe();
+      }
+      send({
+        type: "move-request",
+        id: message.id,
+        placement: { parentId: message.parentId, beforeId: null, floating },
       });
     } else if (message.type === "settings") {
       editable = message.editable === true;
@@ -974,7 +1072,7 @@ function start(channel: string) {
   });
   const style = document.createElement("style");
   style.textContent =
-    '[data-tweakloom-id]{cursor:grab}[data-tweakloom-selected]{outline:2px solid #7655db!important;outline-offset:5px}[data-tweakloom-container]{position:relative}[data-tweakloom-mode="edit"] [data-tweakloom-id]{user-select:none}[data-tweakloom-mode="preview"] [data-tweakloom-id]{cursor:auto}';
+    '[data-tweakloom-id="page-root"] > *{pointer-events:auto}[data-tweakloom-id]{cursor:grab}[data-tweakloom-selected]{outline:2px solid #7655db!important;outline-offset:5px}[data-tweakloom-container]{position:relative}[data-tweakloom-mode="edit"] [data-tweakloom-id]{user-select:none}[data-tweakloom-mode="preview"] [data-tweakloom-id]{cursor:auto}';
   document.head.append(style);
   send({ type: "ready" });
 }
