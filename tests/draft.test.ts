@@ -380,3 +380,62 @@ test("validates component request snapshots and produces a fenced AI handoff", (
   );
   assert.throws(() => model.buildHandoff(model.emptyDraft()));
 });
+
+test("grid cells are validated and movement preserves spans but clears placement outside grids", () => {
+  const target = { id: "draft-button", tag: "button", parentId: "draft-board" };
+  const draft = model.emptyDraft();
+  for (const cell of [
+    { column: 0, row: 1 },
+    { column: 13, row: 1 },
+    { column: 1, row: -1 },
+    { column: 1.5, row: 1 },
+  ]) {
+    assert.throws(() =>
+      model.parsePlacement(
+        JSON.stringify({ parentId: "draft-board", beforeId: null, cell }),
+      ),
+    );
+  }
+  const moved = model.moveOperations([], target, {
+    parentId: "draft-board",
+    beforeId: null,
+    cell: { column: 4, row: 3 },
+  });
+  assert.equal(
+    moved.find((op) => op.kind === "style" && op.property === "gridColumnStart")
+      ?.after,
+    "4",
+  );
+  assert.equal(
+    moved.find((op) => op.kind === "style" && op.property === "gridRowStart")
+      ?.after,
+    "3",
+  );
+  const sized = model.upsertOperation(moved, {
+    targetId: target.id,
+    tag: target.tag,
+    kind: "style",
+    property: "gridColumnEnd",
+    before: "auto",
+    after: "span 3",
+  });
+  const again = model.moveOperations(sized, target, {
+    parentId: "draft-board",
+    beforeId: null,
+    cell: { column: 2, row: 4 },
+  });
+  assert.equal(
+    again.find((op) => op.kind === "style" && op.property === "gridColumnEnd")
+      ?.after,
+    "span 3",
+  );
+  const out = model.moveOperations(again, target, {
+    parentId: "hero-content",
+    beforeId: null,
+  });
+  assert.equal(
+    out.some((op) => op.kind === "style" && op.property === "gridColumnStart"),
+    false,
+  );
+  model.validateDraft({ ...draft, operations: moved });
+});

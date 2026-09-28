@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  freeGridStyles,
   fonts,
   styleFields,
   optionLabels,
@@ -97,6 +98,29 @@ export function Inspector({
   }, [element]);
   const style = (property: StyleProperty, after: string) => {
     editing.current.delete(property);
+    if (property === "gridColumnStart" && after !== "auto")
+      after = String(
+        Math.min(
+          Number(after),
+          Math.max(
+            1,
+            (element.parentGridColumns ?? 12) -
+              (Number(values.gridColumnEnd.replace("span ", "")) || 1) +
+              1,
+          ),
+        ),
+      );
+    if (property === "gridColumnEnd" && after !== "auto")
+      after = `span ${Math.min(Number(after.replace("span ", "")), Math.max(1, (element.parentGridColumns ?? 12) - (Number(values.gridColumnStart) || 1) + 1))}`;
+    if (property === "gridRowStart" && after !== "auto")
+      after = String(
+        Math.min(
+          Number(after),
+          40 - (Number(values.gridRowEnd.replace("span ", "")) || 1) + 1,
+        ),
+      );
+    if (property === "gridRowEnd" && after !== "auto")
+      after = `span ${Math.min(Number(after.replace("span ", "")), 40 - (Number(values.gridRowStart) || 1) + 1)}`;
     apply({
       targetId: element.id,
       tag: element.tag,
@@ -204,6 +228,29 @@ export function Inspector({
       {element.container && (
         <section className="property-section">
           <h3>내부 요소 배치</h3>
+          <button
+            className="small-apply"
+            onClick={() =>
+              applyMany(
+                Object.entries(freeGridStyles).map(([property, after]) => ({
+                  targetId: element.id,
+                  tag: element.tag,
+                  kind: "style",
+                  property: property as StyleProperty,
+                  before:
+                    element.baseline?.styles[property as StyleProperty] ??
+                    element.styles[property as StyleProperty],
+                  after,
+                })),
+              )
+            }
+          >
+            자유 그리드로 전환
+          </button>
+          <p className="field-hint">
+            자유 그리드는 빈 칸에 놓을 수 있습니다. 요소의 시작 행·열과 차지할
+            칸 수를 조절하세요. 같은 칸에 놓으면 겹칠 수 있습니다.
+          </p>
           <div className="layout-buttons">
             {(["가로", "세로", "그리드"] as const).map((layout) => (
               <button
@@ -215,6 +262,8 @@ export function Inspector({
                       ? {
                           display: "grid",
                           gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                          gridTemplateRows: "none",
+                          gridAutoRows: "auto",
                           gap: "16px",
                         }
                       : {
@@ -252,7 +301,7 @@ export function Inspector({
                 <select
                   aria-label="그리드 열 수"
                   value={Math.min(
-                    4,
+                    12,
                     element.styles.gridTemplateColumns.split(" ").length,
                   )}
                   onChange={(e) =>
@@ -262,7 +311,7 @@ export function Inspector({
                     )
                   }
                 >
-                  {[1, 2, 3, 4].map((n) => (
+                  {[1, 2, 3, 4, 6, 8, 12].map((n) => (
                     <option key={n} value={n}>
                       {n}열
                     </option>
@@ -430,6 +479,7 @@ export function Inspector({
         </section>
       )}
       {[
+        ...(element.parentGrid ? ["그리드 위치"] : []),
         "글꼴",
         "모양",
         "크기와 여백",
@@ -482,7 +532,15 @@ export function Inspector({
                         )}
                         {field.options.map((option) => (
                           <option key={option} value={option}>
-                            {optionLabels[option] ?? option}
+                            {option.startsWith("span ")
+                              ? `${option.slice(5)}칸`
+                              : option === "auto"
+                                ? "자동"
+                                : option === "64px"
+                                  ? "사용 (64px 행)"
+                                  : option.startsWith("repeat(")
+                                    ? `${option.match(/\d+/)?.[0]}행`
+                                    : (optionLabels[option] ?? option)}
                           </option>
                         ))}
                       </select>

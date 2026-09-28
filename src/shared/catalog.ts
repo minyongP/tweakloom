@@ -1,4 +1,14 @@
+export const freeGridStyles = {
+  display: "grid",
+  gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
+  gridTemplateRows: "repeat(8, 64px)",
+  gridAutoRows: "64px",
+  gap: "8px",
+  alignItems: "flex-start",
+  justifyItems: "stretch",
+} as const;
 export const presets = [
+  { id: "free-grid", label: "자유 그리드", group: "레이아웃", tag: "div" },
   { id: "button", label: "버튼", group: "입력 요소", tag: "button" },
   { id: "dropdown", label: "드롭다운", group: "입력 요소", tag: "select" },
   { id: "input", label: "텍스트 입력", group: "입력 요소", tag: "input" },
@@ -126,7 +136,46 @@ export const styleFields = {
       "repeat(2, minmax(0, 1fr))",
       "repeat(3, minmax(0, 1fr))",
       "repeat(4, minmax(0, 1fr))",
+      "repeat(6, minmax(0, 1fr))",
+      "repeat(8, minmax(0, 1fr))",
+      "repeat(12, minmax(0, 1fr))",
     ],
+  },
+  gridTemplateRows: {
+    label: "그리드 행 수",
+    group: "자동 배치",
+    type: "select",
+    options: ["none", "repeat(4, 64px)", "repeat(8, 64px)", "repeat(12, 64px)"],
+  },
+  gridAutoRows: {
+    label: "빈 칸 배치",
+    group: "자동 배치",
+    type: "select",
+    options: ["auto", "64px"],
+  },
+  gridColumnStart: {
+    label: "시작 열",
+    group: "그리드 위치",
+    type: "select",
+    options: ["auto", ...Array.from({ length: 12 }, (_, i) => String(i + 1))],
+  },
+  gridRowStart: {
+    label: "시작 행",
+    group: "그리드 위치",
+    type: "select",
+    options: ["auto", ...Array.from({ length: 40 }, (_, i) => String(i + 1))],
+  },
+  gridColumnEnd: {
+    label: "차지할 열 수",
+    group: "그리드 위치",
+    type: "select",
+    options: ["auto", ...Array.from({ length: 12 }, (_, i) => `span ${i + 1}`)],
+  },
+  gridRowEnd: {
+    label: "차지할 행 수",
+    group: "그리드 위치",
+    type: "select",
+    options: ["auto", ...Array.from({ length: 12 }, (_, i) => `span ${i + 1}`)],
   },
   translate: { label: "위치", group: "위치", type: "translate" },
 } as const;

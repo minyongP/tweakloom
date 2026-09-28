@@ -1,4 +1,4 @@
-import { presets } from "./shared/catalog.ts";
+import { presets, freeGridStyles } from "./shared/catalog.ts";
 export function createPreset(id: string): HTMLElement {
   const preset = presets.find((p) => p.id === id);
   if (!preset) throw new Error("알 수 없는 컴포넌트입니다");
@@ -77,7 +77,7 @@ export function createPreset(id: string): HTMLElement {
     text.style.margin = "0";
     el.append(title, text);
   }
-  if (["frame", "row", "grid"].includes(id)) {
+  if (["frame", "row", "grid", "free-grid"].includes(id)) {
     el.dataset.tweakloomContainer = "";
     el.setAttribute("aria-label", preset.label);
     Object.assign(el.style, {
@@ -106,5 +106,7 @@ export function createPreset(id: string): HTMLElement {
         alignItems: "start",
       });
   }
+  if (id === "free-grid")
+    Object.assign(el.style, freeGridStyles, { width: "100%" });
   return el;
 }

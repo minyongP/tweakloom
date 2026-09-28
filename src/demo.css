@@ -269,7 +269,7 @@ footer {
   position: relative;
 }
 #draft-board:empty::before {
-  content: "Drop a component to start creating";
+  content: "컴포넌트를 놓아 편집을 시작하세요";
   color: #a796b8;
   font-size: 12px;
   margin: auto;

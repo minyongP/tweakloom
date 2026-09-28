@@ -185,6 +185,12 @@ function start(channel: string) {
     parentId: el.parentElement?.closest<HTMLElement>(
       "[data-tweakloom-container]",
     )?.dataset.tweakloomId,
+    parentGrid:
+      !!el.parentElement &&
+      getComputedStyle(el.parentElement).display.includes("grid"),
+    parentGridColumns: el.parentElement
+      ? getComputedStyle(el.parentElement).gridTemplateColumns.split(" ").length
+      : undefined,
     accepts: el.dataset.tweakloomAccept?.split(" "),
     nextId:
       [...(el.parentElement?.children ?? [])]
@@ -216,7 +222,9 @@ function start(channel: string) {
     for (const previous of active.values())
       if (
         previous.element.isConnected &&
-        read(previous.element, previous.operation) === previous.applied
+        (previous.operation.kind === "style"
+          ? previous.element.style[previous.operation.property]
+          : read(previous.element, previous.operation)) === previous.applied
       )
         write(previous.element, previous.operation, previous.original);
     active.clear();
@@ -326,7 +334,7 @@ function start(channel: string) {
         element: el,
         operation: op,
         original,
-        applied: read(el, op),
+        applied: op.kind === "style" ? el.style[op.property] : read(el, op),
       });
     }
     for (const op of draft.operations.filter((op) => op.kind === "move")) {
@@ -528,6 +536,60 @@ function start(channel: string) {
       return null;
     }
     const css = getComputedStyle(container);
+    if (css.display.includes("grid") && css.gridAutoRows === "64px") {
+      const rect = container.getBoundingClientRect();
+      const px = (value: string) => parseFloat(value) || 0;
+      const widths = css.gridTemplateColumns.split(" ").map(px);
+      const heights = css.gridTemplateRows.split(" ").map(px);
+      if (
+        !widths.length ||
+        widths.length > 12 ||
+        !heights.length ||
+        heights.length > 40 ||
+        widths.some((v) => v <= 0) ||
+        heights.some((v) => v <= 0)
+      )
+        return null;
+      const left = rect.left + container.clientLeft + px(css.paddingLeft);
+      const top = rect.top + container.clientTop + px(css.paddingTop);
+      const locate = (point: number, sizes: number[], gap: number) => {
+        let offset = 0;
+        for (let i = 0; i < sizes.length; i++) {
+          if (point < offset + sizes[i] + gap / 2 || i === sizes.length - 1)
+            return { index: i + 1, offset, size: sizes[i] };
+          offset += sizes[i] + gap;
+        }
+        return { index: 1, offset: 0, size: sizes[0] };
+      };
+      let column = locate(x - left, widths, px(css.columnGap));
+      const span = moving
+        ? Number(getComputedStyle(moving).gridColumnEnd.replace("span ", "")) ||
+          1
+        : 1;
+      if (column.index + span - 1 > widths.length) {
+        const index = Math.max(1, widths.length - span + 1);
+        column = {
+          index,
+          offset:
+            widths.slice(0, index - 1).reduce((a, b) => a + b, 0) +
+            (index - 1) * px(css.columnGap),
+          size: widths[index - 1],
+        };
+      }
+      const row = locate(y - top, heights, px(css.rowGap));
+      Object.assign(guide.style, {
+        display: "block",
+        left: `${left + column.offset}px`,
+        top: `${top + row.offset}px`,
+        width: `${column.size}px`,
+        height: `${row.size}px`,
+      });
+      return {
+        parentId: container.dataset.tweakloomId!,
+        beforeId: null,
+        cell: { column: column.index, row: row.index },
+      };
+    }
     const horizontal =
       css.display.includes("grid") ||
       (css.display.includes("flex") && css.flexDirection.startsWith("row"));
@@ -810,6 +872,7 @@ function start(channel: string) {
             preset: value.preset,
             parentId: placement.parentId,
             beforeId: placement.beforeId,
+            cell: placement.cell,
           });
         else
           send({

@@ -101,7 +101,8 @@ export function Library({
                         {preset.id === "row" && (
                           <span className="mini-frame">▯ ▯ ▯</span>
                         )}
-                        {preset.id === "grid" && (
+                        {(preset.id === "grid" ||
+                          preset.id === "free-grid") && (
                           <span className="mini-frame">▦</span>
                         )}
                       </span>

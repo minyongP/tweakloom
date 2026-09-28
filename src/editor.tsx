@@ -204,6 +204,7 @@ function App() {
           event.data.parentId,
           event.data.placement,
           event.data.beforeId,
+          event.data.cell,
         );
       if (
         event.data.type === "move-request" &&
@@ -350,8 +351,45 @@ function App() {
   function applyMany(ops: Operation[]) {
     if (saving || reloading) return;
     try {
+      const adjusted = [...ops];
+      for (const op of ops) {
+        if (op.kind !== "style" || op.property !== "gridTemplateColumns")
+          continue;
+        const columns = Number(op.after.match(/repeat\((\d+)/)?.[1]);
+        if (!columns) continue;
+        for (const child of elements.filter(
+          (el) => el.parentId === op.targetId,
+        )) {
+          const span = Math.min(
+            columns,
+            Number(child.styles.gridColumnEnd.replace("span ", "")) || 1,
+          );
+          const start = Number(child.styles.gridColumnStart);
+          for (const [property, after] of [
+            [
+              "gridColumnEnd",
+              child.styles.gridColumnEnd === "auto" ? "auto" : `span ${span}`,
+            ],
+            [
+              "gridColumnStart",
+              start ? String(Math.min(start, columns - span + 1)) : "auto",
+            ],
+          ] as const) {
+            if (after !== child.styles[property])
+              adjusted.push({
+                targetId: child.id,
+                tag: child.tag,
+                kind: "style",
+                property,
+                before:
+                  child.baseline?.styles[property] ?? child.styles[property],
+                after,
+              });
+          }
+        }
+      }
       change(
-        ops.reduce(
+        adjusted.reduce(
           (operations, op) => upsertOperation(operations, op),
           draft.operations,
         ),
@@ -374,6 +412,7 @@ function App() {
     parentId?: string,
     placement?: { before: string; after: string },
     beforeId?: string | null,
+    cell?: Placement["cell"],
   ) {
     if (!loaded || saving || reloading) return;
     const preset = presets.find((p) => p.id === presetId);
@@ -403,11 +442,11 @@ function App() {
           before: placement.before,
           after: placement.after,
         });
-      if (beforeId)
+      if (beforeId || cell)
         operations = moveOperations(
           operations,
           { id, tag: preset.tag, parentId: parent },
-          { parentId: parent, beforeId },
+          { parentId: parent, beforeId: beforeId ?? null, cell },
         );
       change(operations);
       setRightTab("디자인");
