@@ -85,3 +85,178 @@ test("serializes revision-checked saves, retains a backup and preserves corrupt 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("accepts detailed styles, insertion and action specs while rejecting unsafe values", () => {
+  const draft = {
+    ...sample(),
+    operations: [
+      {
+        targetId: "draft-button",
+        tag: "button",
+        kind: "insert",
+        parentId: "draft-board",
+        before: "",
+        after: "button",
+      },
+      {
+        targetId: "draft-button",
+        tag: "button",
+        kind: "style",
+        property: "translate",
+        before: "none",
+        after: "48px -16px",
+      },
+      {
+        targetId: "hero-title",
+        tag: "h1",
+        kind: "style",
+        property: "fontFamily",
+        before: "Arial",
+        after: "Georgia, serif",
+      },
+      {
+        targetId: "draft-button",
+        tag: "button",
+        kind: "interaction",
+        before: "",
+        after: JSON.stringify({
+          type: "navigate",
+          destination: "/products",
+          newTab: false,
+        }),
+      },
+    ],
+  };
+  assert.doesNotThrow(() => model.validateDraft(draft));
+  for (const operation of [
+    {
+      targetId: "draft-bad",
+      tag: "script",
+      kind: "insert",
+      parentId: "draft-board",
+      before: "",
+      after: "script",
+    },
+    {
+      targetId: "hero-title",
+      tag: "h1",
+      kind: "style",
+      property: "fontFamily",
+      before: "Arial",
+      after: "url(https://bad.example/font)",
+    },
+    {
+      targetId: "hero-title",
+      tag: "h1",
+      kind: "interaction",
+      before: "",
+      after: JSON.stringify({
+        type: "navigate",
+        destination: "javascript:alert(1)",
+        newTab: false,
+      }),
+    },
+    {
+      targetId: "hero-title",
+      tag: "h1",
+      kind: "style",
+      property: "translate",
+      before: "none",
+      after: "10000000px 0px",
+    },
+  ])
+    assert.throws(() =>
+      model.validateDraft({ ...sample(), operations: [operation] }),
+    );
+  const api = {
+    type: "api",
+    method: "POST",
+    url: "/api/items",
+    headers: '{"Content-Type":"application/json"}',
+    body: '{"name":"test"}',
+    credentialRef: "API_TOKEN",
+    responseStatus: 201,
+    response: '{"ok":true}',
+  };
+  const apiDraft = (value: unknown) => ({
+    ...sample(),
+    operations: [
+      {
+        targetId: "hero-button",
+        tag: "button",
+        kind: "interaction",
+        before: "",
+        after: JSON.stringify(value),
+      },
+    ],
+  });
+  assert.doesNotThrow(() => model.validateDraft(apiDraft(api)));
+  assert.throws(() =>
+    model.validateDraft(apiDraft({ ...api, url: "file:///etc/passwd" })),
+  );
+  assert.throws(() =>
+    model.validateDraft(apiDraft({ ...api, body: "{broken" })),
+  );
+  assert.throws(() =>
+    model.validateDraft(
+      apiDraft({ ...api, headers: '{"Authorization":"secret"}' }),
+    ),
+  );
+});
+
+test("rejects inherited style keys and cycles, and removes inserted subtree edits", () => {
+  for (const property of ["constructor", "__proto__", "toString"]) {
+    assert.throws(() =>
+      model.validateDraft({
+        ...model.emptyDraft(),
+        operations: [
+          {
+            targetId: "hero-title",
+            tag: "h1",
+            kind: "style",
+            property,
+            before: "",
+            after: "1px",
+          },
+        ],
+      }),
+    );
+  }
+  const parent: model.Operation = {
+    targetId: "draft-parent",
+    tag: "div",
+    kind: "insert",
+    parentId: "draft-board",
+    before: "",
+    after: "frame",
+  };
+  const child: model.Operation = {
+    targetId: "draft-child",
+    tag: "button",
+    kind: "insert",
+    parentId: "draft-parent",
+    before: "",
+    after: "button",
+  };
+  const edit: model.Operation = {
+    targetId: "draft-child",
+    tag: "button",
+    kind: "text",
+    before: "Button",
+    after: "Go",
+  };
+  const operations = [parent, child, edit];
+  assert.doesNotThrow(() =>
+    model.validateDraft({ ...model.emptyDraft(), operations }),
+  );
+  assert.deepEqual(model.removeOperation(operations, parent), []);
+  assert.throws(() =>
+    model.validateDraft({
+      ...model.emptyDraft(),
+      operations: [{ ...parent, parentId: "draft-child" }, child],
+    }),
+  );
+  assert.throws(() =>
+    model.validateDraft({ ...model.emptyDraft(), operations: [child] }),
+  );
+});

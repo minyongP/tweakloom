@@ -5,13 +5,13 @@ import {
   operationKey,
   upsertOperation,
   validateDraft,
+  removeOperation,
 } from "./shared/draft.ts";
-import type {
-  Draft,
-  ElementInfo,
-  Operation,
-  StyleProperty,
-} from "./shared/draft.ts";
+import type { Draft, ElementInfo, Operation } from "./shared/draft.ts";
+import { presets } from "./shared/catalog.ts";
+import type { PresetId } from "./shared/catalog.ts";
+import { Library } from "./library.tsx";
+import { Inspector, Actions } from "./inspector.tsx";
 import "./editor.css";
 
 const recoveryKey = "tweakloom:demo:unsaved";
@@ -49,6 +49,13 @@ function App() {
   const [elements, setElements] = useState<ElementInfo[]>([]);
   const [generation, setGeneration] = useState(0);
   const [history, setHistory] = useState<Operation[][]>([]);
+  const [rightTab, setRightTab] = useState<"Design" | "Actions" | "Insert">(
+    "Design",
+  );
+  const [simulate, setSimulate] = useState(false);
+  const [snap, setSnap] = useState(false);
+  const [simulation, setSimulation] = useState("");
+  const pendingSelect = useRef<string | null>(null);
   const [channel] = useState(() => crypto.randomUUID());
   const iframe = useRef<HTMLIFrameElement>(null);
   const latest = useRef(draft);
@@ -105,6 +112,12 @@ function App() {
         return;
       if (event.data.type === "ready") {
         send({ type: "draft", draft: latest.current });
+        send({
+          type: "settings",
+          editable: !saving && !reloading,
+          simulate,
+          snap,
+        });
       }
       if (
         event.data.type === "state" &&
@@ -115,13 +128,34 @@ function App() {
         setElements(event.data.elements);
         setSelected(event.data.selected);
         setConflicts(event.data.conflicts);
+        if (
+          pendingSelect.current &&
+          event.data.elements.some(
+            (el: ElementInfo) => el.id === pendingSelect.current,
+          )
+        ) {
+          send({ type: "select", id: pendingSelect.current });
+          pendingSelect.current = null;
+        }
       }
+      if (event.data.type === "edit" && !saving && !reloading)
+        apply(event.data.operation);
+      if (event.data.type === "insert-request" && !saving && !reloading)
+        insert(event.data.preset, event.data.parentId, event.data.placement);
+      if (
+        event.data.type === "simulation" &&
+        typeof event.data.text === "string"
+      )
+        setSimulation(event.data.text);
       if (event.data.type === "error" && typeof event.data.error === "string")
         setError(event.data.error);
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [channel]);
+  }, [channel, draft, saving, reloading, simulate, snap]);
+  useEffect(() => {
+    send({ type: "settings", editable: !saving && !reloading, simulate, snap });
+  }, [saving, reloading, simulate, snap, connected]);
   useEffect(() => {
     if (!loaded) return;
     send({ type: "draft", draft });
@@ -143,14 +177,56 @@ function App() {
   }, [dirty]);
 
   function change(operations: Operation[]) {
+    validateDraft({ ...draft, operations });
     setHistory((prior) => [...prior.slice(-49), draft.operations]);
     setDraft({ ...draft, operations });
   }
   function apply(op: Operation) {
+    if (saving || reloading) return;
     try {
       change(upsertOperation(draft.operations, op));
       setError("");
     } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  function insert(
+    presetId: PresetId,
+    parentId?: string,
+    placement?: { before: string; after: string },
+  ) {
+    if (!loaded || saving || reloading) return;
+    const preset = presets.find((p) => p.id === presetId);
+    if (!preset) return;
+    const id = `draft-${crypto.randomUUID()}`;
+    const parent =
+      parentId ??
+      (selected?.container ? selected.id : selected?.parentId) ??
+      "draft-board";
+    try {
+      pendingSelect.current = id;
+      let operations = upsertOperation(draft.operations, {
+        targetId: id,
+        tag: preset.tag,
+        kind: "insert",
+        parentId: parent,
+        before: "",
+        after: preset.id,
+      });
+      if (placement)
+        operations = upsertOperation(operations, {
+          targetId: id,
+          tag: preset.tag,
+          kind: "style",
+          property: "translate",
+          before: placement.before,
+          after: placement.after,
+        });
+      change(operations);
+      setRightTab("Design");
+      setError("");
+    } catch (e) {
+      pendingSelect.current = null;
       setError((e as Error).message);
     }
   }
@@ -211,6 +287,16 @@ function App() {
       <div className="workspace">
         <aside className="layers" aria-label="Elements">
           <div className="panel-heading">
+            <span>COMPONENTS</span>
+            <span className="count">{presets.length}</span>
+          </div>
+          <Library
+            side="Left"
+            channel={channel}
+            disabled={!connected || saving || reloading || simulate}
+            insert={insert}
+          />
+          <div className="panel-heading">
             <span>PAGE ELEMENTS</span>
             <span className="count">{elements.length}</span>
           </div>
@@ -245,16 +331,37 @@ function App() {
               <br />
               Your source stays untouched.
             </p>
-            <span className="phase-label">Phase 1 · React demo</span>
+            <span className="phase-label">Visual workspace · React demo</span>
           </div>
         </aside>
         <main className="canvas-area">
           <div className="canvas-toolbar">
             <div>
               <span className="mode-indicator">↖</span>
-              <strong>Edit draft</strong>
+              <strong>{simulate ? "Preview actions" : "Move & edit"}</strong>
               <span className="toolbar-divider" />
-              <span className="muted">Click an element to inspect</span>
+              <span className="muted">Click to select · drag to move</span>
+            </div>
+            <div className="canvas-options">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={snap}
+                  onChange={(e) => setSnap(e.target.checked)}
+                />
+                8px grid
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={simulate}
+                  onChange={(e) => {
+                    setSimulate(e.target.checked);
+                    setSimulation("");
+                  }}
+                />
+                Preview actions
+              </label>
             </div>
             <button
               className="icon-button"
@@ -305,11 +412,52 @@ function App() {
           </div>
         </main>
         <aside className="inspector" aria-label="Inspector">
-          <div className="panel-heading">
-            <span>INSPECTOR</span>
-            <span>⚙</span>
+          <div
+            className="inspector-tabs"
+            role="tablist"
+            aria-label="Inspector sections"
+          >
+            {(["Design", "Actions", "Insert"] as const).map((tab) => (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={rightTab === tab}
+                onClick={() => setRightTab(tab)}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-          {selected ? (
+          {rightTab === "Insert" ? (
+            <Library
+              side="Right"
+              channel={channel}
+              disabled={!connected || saving || reloading || simulate}
+              insert={insert}
+            />
+          ) : selected && rightTab === "Actions" ? (
+            <Actions
+              key={`${selected.id}:${draft.operations.find((op) => op.targetId === selected.id && op.kind === "interaction")?.after ?? ""}`}
+              element={selected}
+              disabled={saving || reloading}
+              operation={draft.operations.find(
+                (op) =>
+                  op.targetId === selected.id && op.kind === "interaction",
+              )}
+              apply={apply}
+              test={() => send({ type: "test-action", id: selected.id })}
+              remove={() =>
+                change(
+                  draft.operations.filter(
+                    (op) =>
+                      !(
+                        op.targetId === selected.id && op.kind === "interaction"
+                      ),
+                  ),
+                )
+              }
+            />
+          ) : selected ? (
             <Inspector
               key={selected.id}
               element={selected}
@@ -351,20 +499,16 @@ function App() {
                 <div>
                   <strong>{op.targetId}</strong>
                   <p>
-                    {op.kind === "text" ? "Text" : op.property} →{" "}
-                    {op.after || "(empty)"}
+                    {op.kind === "style" ? op.property : op.kind} →{" "}
+                    {op.kind === "interaction"
+                      ? "Click action"
+                      : op.after || "(empty)"}
                   </p>
                 </div>
                 <button
                   aria-label={`Remove ${operationKey(op)}`}
                   disabled={saving || reloading}
-                  onClick={() =>
-                    change(
-                      draft.operations.filter(
-                        (item) => operationKey(item) !== operationKey(op),
-                      ),
-                    )
-                  }
+                  onClick={() => change(removeOperation(draft.operations, op))}
                 >
                   ×
                 </button>
@@ -398,6 +542,20 @@ function App() {
           </div>
         </aside>
       </div>
+      {simulation && (
+        <section className="simulation-result" aria-label="Action preview">
+          <div>
+            <strong>Action preview</strong>
+            <button
+              aria-label="Close action preview"
+              onClick={() => setSimulation("")}
+            >
+              ×
+            </button>
+          </div>
+          <pre>{simulation}</pre>
+        </section>
+      )}
       {(error || conflicts.length > 0) && (
         <div className="error-banner" role="alert">
           <strong>
@@ -411,166 +569,6 @@ function App() {
         </div>
       )}
     </div>
-  );
-}
-
-function Inspector({
-  element,
-  disabled,
-  apply,
-}: {
-  element: ElementInfo;
-  disabled: boolean;
-  apply: (op: Operation) => void;
-}) {
-  const [text, setText] = useState(element.text);
-  const editing = useRef(new Set<string>());
-  const hex = (value: string) => {
-    const parts = value.match(/\d+/g);
-    return parts?.length === 3
-      ? `#${parts.map((n) => Number(n).toString(16).padStart(2, "0")).join("")}`
-      : "#000000";
-  };
-  const [values, setValues] = useState<Record<StyleProperty, string>>({
-    color: hex(element.styles.color),
-    backgroundColor: hex(element.styles.backgroundColor),
-    padding: String(parseInt(element.styles.padding) || 0),
-    borderRadius: String(parseInt(element.styles.borderRadius) || 0),
-    fontSize: String(parseInt(element.styles.fontSize) || 16),
-    width: String(parseInt(element.styles.width) || 0),
-  });
-  useEffect(() => {
-    if (!editing.current.has("text")) setText(element.text);
-    setValues(
-      (current) =>
-        Object.fromEntries(
-          Object.entries(element.styles).map(([key, value]) => [
-            key,
-            editing.current.has(key)
-              ? current[key as StyleProperty]
-              : key === "color" || key === "backgroundColor"
-                ? hex(value)
-                : String(parseInt(value) || 0),
-          ]),
-        ) as Record<StyleProperty, string>,
-    );
-  }, [element]);
-  const labels: Record<StyleProperty, string> = {
-    color: "Text color",
-    backgroundColor: "Background",
-    padding: "Padding",
-    borderRadius: "Corner radius",
-    fontSize: "Font size",
-    width: "Width",
-  };
-  return (
-    <fieldset disabled={disabled} className="properties">
-      <div className="selected-element">
-        <span className="selected-tag">{element.tag}</span>
-        <div>
-          <h2>{element.id.replaceAll("-", " ")}</h2>
-          <span>Selected instance</span>
-        </div>
-      </div>
-      {element.leaf ? (
-        <section className="property-section">
-          <h3>Content</h3>
-          <label htmlFor="text-content">Text content</label>
-          <textarea
-            id="text-content"
-            value={text}
-            maxLength={2000}
-            onChange={(e) => {
-              editing.current.add("text");
-              setText(e.target.value);
-            }}
-            rows={3}
-          />
-          <button
-            className="small-apply"
-            onClick={() => {
-              editing.current.delete("text");
-              apply({
-                targetId: element.id,
-                tag: element.tag,
-                kind: "text",
-                before: element.baseline?.text ?? element.text,
-                after: text,
-              });
-            }}
-          >
-            Apply text
-          </button>
-        </section>
-      ) : (
-        <p className="nested-note">
-          Contains child elements. Select a text element to edit its content.
-        </p>
-      )}
-      <section className="property-section">
-        <h3>Appearance</h3>
-        {(
-          [
-            "color",
-            "backgroundColor",
-            "fontSize",
-            "padding",
-            "borderRadius",
-            "width",
-          ] as StyleProperty[]
-        ).map((property) => {
-          const isColor =
-            property === "color" || property === "backgroundColor";
-          return (
-            <div className="property" key={property}>
-              <label htmlFor={property}>
-                {labels[property]}
-                {!isColor && " (px)"}
-              </label>
-              <div className="property-control">
-                <input
-                  id={property}
-                  type={isColor ? "color" : "number"}
-                  min="0"
-                  max="9999"
-                  value={values[property]}
-                  onChange={(e) => {
-                    editing.current.add(property);
-                    setValues({ ...values, [property]: e.target.value });
-                  }}
-                />
-                {isColor && (
-                  <span className="hex-value">{values[property]}</span>
-                )}
-                <button
-                  aria-label={`Apply ${property}`}
-                  onClick={() => {
-                    editing.current.delete(property);
-                    apply({
-                      targetId: element.id,
-                      tag: element.tag,
-                      kind: "style",
-                      property,
-                      before:
-                        element.baseline?.styles[property] ??
-                        element.styles[property],
-                      after: isColor
-                        ? values[property]
-                        : `${values[property]}px`,
-                    });
-                  }}
-                >
-                  ↵
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </section>
-      <p className="viewport-note">
-        Changes describe this viewport. Responsive implementation comes later.
-      </p>
-    </fieldset>
   );
 }
 

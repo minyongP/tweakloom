@@ -252,3 +252,29 @@ footer {
     display: none;
   }
 }
+.draft-board-section {
+  margin-top: 36px;
+}
+#draft-board {
+  min-height: 220px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 18px;
+  padding: 24px;
+  background: #f2eff7;
+  border: 1px dashed #cfc3de;
+  border-radius: 8px;
+  position: relative;
+}
+#draft-board:empty::before {
+  content: "Drop a component to start creating";
+  color: #a796b8;
+  font-size: 12px;
+  margin: auto;
+  pointer-events: none;
+}
+[data-tweakloom-preset] {
+  max-width: 100%;
+}

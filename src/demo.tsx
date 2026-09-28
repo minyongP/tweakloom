@@ -15,7 +15,11 @@ function Demo() {
       </nav>
       <main>
         <section className="hero">
-          <div className="hero-copy">
+          <div
+            className="hero-copy"
+            data-tweakloom-id="hero-content"
+            data-tweakloom-container=""
+          >
             <p className="eyebrow" data-tweakloom-id="eyebrow">
               LESS CLUTTER. MORE CLARITY.
             </p>
@@ -62,8 +66,12 @@ function Demo() {
             </h2>
             <span>Considered, not complicated.</span>
           </div>
-          <div className="cards">
-            <article data-tweakloom-id="card-notes">
+          <div
+            className="cards"
+            data-tweakloom-id="collection-cards"
+            data-tweakloom-container=""
+          >
+            <article data-tweakloom-id="card-notes" data-tweakloom-container="">
               <span className="number">01 / CAPTURE</span>
               <h3 data-tweakloom-id="notes-title">A place for ideas</h3>
               <p data-tweakloom-id="notes-description">
@@ -71,7 +79,7 @@ function Demo() {
               </p>
               <span className="arrow">↗</span>
             </article>
-            <article data-tweakloom-id="card-focus">
+            <article data-tweakloom-id="card-focus" data-tweakloom-container="">
               <span className="number">02 / FOCUS</span>
               <h3 data-tweakloom-id="focus-title">Clear some space</h3>
               <p data-tweakloom-id="focus-description">
@@ -79,7 +87,7 @@ function Demo() {
               </p>
               <span className="arrow">↗</span>
             </article>
-            <article data-tweakloom-id="card-pause">
+            <article data-tweakloom-id="card-pause" data-tweakloom-container="">
               <span className="number">03 / RESET</span>
               <h3 data-tweakloom-id="pause-title">Take a little pause</h3>
               <p data-tweakloom-id="pause-description">
@@ -88,6 +96,18 @@ function Demo() {
               <span className="arrow">↗</span>
             </article>
           </div>
+        </section>
+        <section className="draft-board-section">
+          <div className="section-title">
+            <h2>Your draft board</h2>
+            <span>Drop components here</span>
+          </div>
+          <div
+            id="draft-board"
+            data-tweakloom-id="draft-board"
+            data-tweakloom-container=""
+            aria-label="Draft board"
+          />
         </section>
         <footer>
           <span>Everyday objects, thoughtfully made.</span>

@@ -19,7 +19,7 @@ test("edits a draft, restores it after reload and never changes source", async (
     .getByRole("heading", { name: "Make room for good work." })
     .click();
   await page.getByLabel("Text content").fill("A little more room.");
-  await page.getByRole("button", { name: "Apply text" }).click();
+  await page.getByRole("button", { name: "Apply text", exact: true }).click();
   await page.getByLabel("Padding (px)").fill("32");
   await page.getByRole("button", { name: "Apply padding" }).click();
   await expect(preview.locator('[data-tweakloom-id="hero-title"]')).toHaveCSS(
@@ -52,7 +52,7 @@ test("flags missing or ambiguous targets and changed baselines without overwriti
     .getByRole("heading", { name: "Make room for good work." })
     .click();
   await page.getByLabel("Text content").fill("Draft title");
-  await page.getByRole("button", { name: "Apply text" }).click();
+  await page.getByRole("button", { name: "Apply text", exact: true }).click();
   const frame = page.frames().find((f) => f.url().includes("/demo.html"))!;
   await frame.evaluate(() => {
     document.querySelector('[data-tweakloom-id="hero-title"]')!.textContent =
@@ -120,7 +120,7 @@ test("keeps an unsaved draft through reload and actual Vite source updates", asy
     .getByRole("heading", { name: "Make room for good work." })
     .click();
   await page.getByLabel("Text content").fill("Keep my unsaved draft");
-  await page.getByRole("button", { name: "Apply text" }).click();
+  await page.getByRole("button", { name: "Apply text", exact: true }).click();
   await expect(
     preview.getByRole("heading", { name: "Keep my unsaved draft" }),
   ).toBeVisible();
