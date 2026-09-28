@@ -37,3 +37,7 @@ A shared local web editor with a proposed MCP bridge and tool-specific plugin pa
 ## License
 
 [MIT](LICENSE)
+
+## Design
+
+See the [design document (Korean)](docs/design.md) for the proposed architecture, editing scope, AI handoff contract, and acceptance criteria. This is a review draft, not an implemented feature list.
