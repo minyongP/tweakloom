@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { fonts, styleFields } from "./shared/catalog.ts";
+import {
+  fonts,
+  styleFields,
+  optionLabels,
+  elementLabels,
+} from "./shared/catalog.ts";
 import { parseInteraction } from "./shared/draft.ts";
 import type {
   ElementInfo,
@@ -106,34 +111,34 @@ export function Inspector({
       <div className="selected-element">
         <span className="selected-tag">{element.tag}</span>
         <div>
-          <h2>{element.id.replaceAll("-", " ")}</h2>
-          <span>
-            {element.container ? "Frame / container" : "Selected instance"}
-          </span>
+          <h2>
+            {elementLabels[element.id] ?? element.id.replaceAll("-", " ")}
+          </h2>
+          <span>{element.container ? "프레임 / 컨테이너" : "선택한 요소"}</span>
         </div>
       </div>
       {!freeMove && (
         <section className="property-section">
-          <h3>Layout placement</h3>
+          <h3>배치 순서</h3>
           <p className="field-hint">
             {element.parentId
-              ? `Inside ${element.parentId.replaceAll("-", " ")}. Drag between components to rearrange.`
-              : "Select a component inside a frame to rearrange it."}
+              ? `${element.parentId} 안에 있습니다. 컴포넌트 사이로 드래그해 순서를 바꾸세요.`
+              : "프레임 안의 컴포넌트를 선택해 순서를 바꾸세요."}
           </p>
           <div className="layout-buttons">
             <button
               disabled={!element.parentId}
               onClick={() => nudge("earlier")}
             >
-              Move earlier
+              앞으로 이동
             </button>
             <button disabled={!element.parentId} onClick={() => nudge("later")}>
-              Move later
+              뒤로 이동
             </button>
           </div>
           {element.parentId && (
             <button className="small-apply" onClick={selectParent}>
-              Edit parent layout
+              상위 프레임 배치 수정
             </button>
           )}
           {element.styles.translate !== "none" && (
@@ -141,19 +146,19 @@ export function Inspector({
               className="small-apply"
               onClick={() => style("translate", "none")}
             >
-              Return to layout
+              자동 배치로 복귀
             </button>
           )}
         </section>
       )}
       {freeMove && (
         <section className="property-section">
-          <h3>Position</h3>
+          <h3>위치</h3>
           <div className="position-row">
             <label>
               X
               <input
-                aria-label="Position X"
+                aria-label="X 위치"
                 type="number"
                 min="-9999"
                 max="9999"
@@ -167,7 +172,7 @@ export function Inspector({
             <label>
               Y
               <input
-                aria-label="Position Y"
+                aria-label="Y 위치"
                 type="number"
                 min="-9999"
                 max="9999"
@@ -179,34 +184,34 @@ export function Inspector({
               />
             </label>
             <button
-              aria-label="Apply position"
+              aria-label="위치 적용"
               onClick={() => style("translate", `${x}px ${y}px`)}
             >
               ↵
             </button>
             <button
-              aria-label="Reset position"
+              aria-label="위치 초기화"
               onClick={() => style("translate", "none")}
             >
               ↺
             </button>
           </div>
           <p className="field-hint">
-            Drag on the page, or set offsets from the original layout.
+            화면에서 드래그하거나 원래 위치 기준 이동 거리를 입력하세요.
           </p>
         </section>
       )}
       {element.container && (
         <section className="property-section">
-          <h3>Arrange children</h3>
+          <h3>내부 요소 배치</h3>
           <div className="layout-buttons">
-            {(["Row", "Column", "Grid"] as const).map((layout) => (
+            {(["가로", "세로", "그리드"] as const).map((layout) => (
               <button
                 key={layout}
-                aria-label={`${layout} layout`}
+                aria-label={`${layout} 배치`}
                 onClick={() => {
                   const styles: Partial<Record<StyleProperty, string>> =
-                    layout === "Grid"
+                    layout === "그리드"
                       ? {
                           display: "grid",
                           gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
@@ -214,8 +219,8 @@ export function Inspector({
                         }
                       : {
                           display: "flex",
-                          flexDirection: layout === "Row" ? "row" : "column",
-                          flexWrap: layout === "Row" ? "wrap" : "nowrap",
+                          flexDirection: layout === "가로" ? "row" : "column",
+                          flexWrap: layout === "가로" ? "wrap" : "nowrap",
                           alignItems: "flex-start",
                         };
                   applyMany(
@@ -232,20 +237,20 @@ export function Inspector({
                   );
                 }}
               >
-                {layout === "Row"
-                  ? "↔ Row"
-                  : layout === "Column"
-                    ? "↕ Column"
-                    : "▦ Grid"}
+                {layout === "가로"
+                  ? "↔ 가로"
+                  : layout === "세로"
+                    ? "↕ 세로"
+                    : "▦ 그리드"}
               </button>
             ))}
           </div>
           <div className="frame-controls">
             {element.styles.display.includes("grid") && (
               <label>
-                Columns
+                열 수
                 <select
-                  aria-label="Grid column count"
+                  aria-label="그리드 열 수"
                   value={Math.min(
                     4,
                     element.styles.gridTemplateColumns.split(" ").length,
@@ -259,17 +264,17 @@ export function Inspector({
                 >
                   {[1, 2, 3, 4].map((n) => (
                     <option key={n} value={n}>
-                      {n} {n === 1 ? "column" : "columns"}
+                      {n}열
                     </option>
                   ))}
                 </select>
               </label>
             )}
             <label>
-              Gap (px)
+              간격 (px)
               <div className="gap-control">
                 <input
-                  aria-label="Frame gap"
+                  aria-label="프레임 간격"
                   type="number"
                   min="0"
                   max="9999"
@@ -280,7 +285,7 @@ export function Inspector({
                   }}
                 />
                 <button
-                  aria-label="Apply frame gap"
+                  aria-label="프레임 간격 적용"
                   onClick={() => style("gap", `${values.gap}px`)}
                 >
                   ↵
@@ -289,26 +294,26 @@ export function Inspector({
             </label>
             <label>
               {isGrid || element.styles.flexDirection.startsWith("row")
-                ? "Vertical align"
-                : "Horizontal align"}
+                ? "세로 정렬"
+                : "가로 정렬"}
               <select
-                aria-label="Frame alignment"
+                aria-label="프레임 정렬"
                 value={element.styles.alignItems}
                 onChange={(e) => style("alignItems", e.target.value)}
               >
                 {!["flex-start", "center", "flex-end", "stretch"].includes(
                   element.styles.alignItems,
-                ) && <option value={element.styles.alignItems}>Current</option>}
-                <option value="flex-start">Start</option>
-                <option value="center">Center</option>
-                <option value="flex-end">End</option>
-                <option value="stretch">Stretch</option>
+                ) && <option value={element.styles.alignItems}>현재 값</option>}
+                <option value="flex-start">시작</option>
+                <option value="center">가운데</option>
+                <option value="flex-end">끝</option>
+                <option value="stretch">늘리기</option>
               </select>
             </label>
             <label>
-              {isGrid ? "Horizontal align" : "Distribute"}
+              {isGrid ? "가로 정렬" : "공간 배분"}
               <select
-                aria-label="Frame distribution"
+                aria-label="프레임 공간 배분"
                 value={element.styles[distributionProperty]}
                 onChange={(e) => style(distributionProperty, e.target.value)}
               >
@@ -322,45 +327,47 @@ export function Inspector({
                   ...(isGrid ? ["stretch"] : []),
                 ].includes(element.styles[distributionProperty]) && (
                   <option value={element.styles[distributionProperty]}>
-                    Current
+                    현재 값
                   </option>
                 )}
-                <option value="flex-start">Start</option>
-                <option value="center">Center</option>
-                <option value="flex-end">End</option>
+                <option value="flex-start">시작</option>
+                <option value="center">가운데</option>
+                <option value="flex-end">끝</option>
                 {isGrid ? (
-                  <option value="stretch">Stretch</option>
+                  <option value="stretch">늘리기</option>
                 ) : (
                   <>
-                    <option value="space-between">Space between</option>
-                    <option value="space-evenly">Even spacing</option>
-                    <option value="space-around">Space around</option>
+                    <option value="space-between">요소 사이 균등</option>
+                    <option value="space-evenly">모든 간격 균등</option>
+                    <option value="space-around">요소 주변 균등</option>
                   </>
                 )}
               </select>
             </label>
           </div>
           <p className="field-hint">
-            Spacing and alignment follow this frame. Drop at an edge to place
-            beside a frame, or in its center to place inside.
-            {element.accepts ? ` Accepts: ${element.accepts.join(", ")}.` : ""}
+            간격과 정렬은 이 프레임을 따릅니다. 가장자리에 놓으면 옆에, 중앙에
+            놓으면 안에 배치됩니다.
+            {element.accepts
+              ? ` 허용 태그: ${element.accepts.join(", ")}.`
+              : ""}
           </p>
         </section>
       )}
       <section className="property-section">
-        <h3>Component width</h3>
+        <h3>컴포넌트 너비</h3>
         <div className="layout-buttons">
           <button onClick={() => style("width", "fit-content")}>
-            Fit content
+            내용에 맞춤
           </button>
-          <button onClick={() => style("width", "100%")}>Fill width</button>
-          <button onClick={() => style("width", "auto")}>Auto</button>
+          <button onClick={() => style("width", "100%")}>너비 채우기</button>
+          <button onClick={() => style("width", "auto")}>자동</button>
         </div>
       </section>
       {element.leaf && (
         <section className="property-section">
-          <h3>Content</h3>
-          <label htmlFor="text-content">Text content</label>
+          <h3>콘텐츠</h3>
+          <label htmlFor="text-content">텍스트 내용</label>
           <textarea
             id="text-content"
             value={text}
@@ -384,14 +391,14 @@ export function Inspector({
               });
             }}
           >
-            Apply text
+            텍스트 적용
           </button>
         </section>
       )}
       {element.tag === "select" && (
         <section className="property-section">
-          <h3>Options</h3>
-          <label htmlFor="dropdown-options">Dropdown options</label>
+          <h3>선택 항목</h3>
+          <label htmlFor="dropdown-options">드롭다운 항목</label>
           <textarea
             id="dropdown-options"
             rows={4}
@@ -402,7 +409,7 @@ export function Inspector({
             }}
           />
           <p className="field-hint">
-            One option per line. Up to 20 unique options.
+            한 줄에 한 항목씩, 중복 없이 최대 20개까지 입력하세요.
           </p>
           <button
             onClick={() => {
@@ -418,15 +425,15 @@ export function Inspector({
               });
             }}
           >
-            Apply options
+            항목 적용
           </button>
         </section>
       )}
       {[
-        "Typography",
-        "Appearance",
-        "Size & spacing",
-        ...(element.container ? ["Auto layout"] : []),
+        "글꼴",
+        "모양",
+        "크기와 여백",
+        ...(element.container ? ["자동 배치"] : []),
       ].map((group) => (
         <section className="property-section" key={group}>
           <h3>{group}</h3>
@@ -470,12 +477,12 @@ export function Inspector({
                           values[property],
                         ) && (
                           <option value={values[property]}>
-                            {values[property] || "Inherited"}
+                            {values[property] || "상속된 값"}
                           </option>
                         )}
                         {field.options.map((option) => (
                           <option key={option} value={option}>
-                            {option}
+                            {optionLabels[option] ?? option}
                           </option>
                         ))}
                       </select>
@@ -502,7 +509,7 @@ export function Inspector({
                       </span>
                     )}
                     <button
-                      aria-label={`Apply ${key}`}
+                      aria-label={`${field.label} 적용`}
                       onClick={() =>
                         style(
                           property,
@@ -523,10 +530,10 @@ export function Inspector({
                 </div>
               );
             })}
-          {group === "Auto layout" && (
+          {group === "자동 배치" && (
             <p className="field-hint">
-              Choose Flex to arrange children in a row or column. Distribution
-              and alignment apply to the container.
+              자동 배치 (Flex)를 선택하면 내부 요소를 가로나 세로로 배치할 수
+              있습니다. 공간 배분과 정렬은 컨테이너에 적용됩니다.
             </p>
           )}
         </section>
@@ -594,28 +601,28 @@ export function Actions({
       <div className="selected-element">
         <span className="selected-tag">↗</span>
         <div>
-          <h2>On click</h2>
+          <h2>클릭했을 때</h2>
           <span>{element.id}</span>
         </div>
       </div>
       <div className="action-fields">
         <label>
-          Action type
+          동작 종류
           <select
             value={type}
             onChange={(e) => setType(e.target.value as "navigate" | "api")}
           >
-            <option value="navigate">Navigate to page</option>
-            <option value="api">API request</option>
+            <option value="navigate">페이지 이동</option>
+            <option value="api">API 요청</option>
           </select>
         </label>
         {type === "navigate" ? (
           <>
             <label>
-              Destination
+              이동 경로
               <input
                 value={destination}
-                placeholder="/checkout or https://…"
+                placeholder="/checkout 또는 https://…"
                 onChange={(e) => setDestination(e.target.value)}
               />
             </label>
@@ -625,13 +632,13 @@ export function Actions({
                 checked={newTab}
                 onChange={(e) => setNewTab(e.target.checked)}
               />
-              Open in new tab
+              새 탭에서 열기
             </label>
           </>
         ) : (
           <>
             <label>
-              HTTP method
+              HTTP 메서드
               <select
                 value={api.method}
                 onChange={(e) => setApi({ ...api, method: e.target.value })}
@@ -649,7 +656,7 @@ export function Actions({
               />
             </label>
             <label>
-              Headers (JSON)
+              헤더 (JSON)
               <textarea
                 rows={3}
                 value={api.headers}
@@ -657,7 +664,7 @@ export function Actions({
               />
             </label>
             <label>
-              Request body (JSON)
+              요청 본문 (JSON)
               <textarea
                 rows={4}
                 value={api.body}
@@ -665,7 +672,7 @@ export function Actions({
               />
             </label>
             <label>
-              Credentials reference
+              인증 정보 참조
               <input
                 placeholder="API_TOKEN"
                 value={api.credentialRef}
@@ -675,11 +682,11 @@ export function Actions({
               />
             </label>
             <p className="field-hint">
-              Reference an environment variable. Do not paste tokens or
-              passwords.
+              환경 변수 이름을 입력하세요. 토큰이나 비밀번호를 직접 붙여 넣지
+              마세요.
             </p>
             <label>
-              Mock status
+              모의 응답 상태
               <input
                 type="number"
                 min="100"
@@ -691,7 +698,7 @@ export function Actions({
               />
             </label>
             <label>
-              Mock response (JSON)
+              모의 응답 (JSON)
               <textarea
                 rows={4}
                 value={api.response}
@@ -703,17 +710,16 @@ export function Actions({
         {error && <p role="alert">{error}</p>}
         <div className="action-buttons">
           <button className="primary" onClick={save}>
-            Apply action
+            동작 적용
           </button>
           <button disabled={!operation} onClick={test}>
-            Test action
+            동작 테스트
           </button>
-          {operation && <button onClick={remove}>Remove action</button>}
+          {operation && <button onClick={remove}>동작 삭제</button>}
         </div>
         <p className="simulation-note">
-          Prototype only. Tests simulate the saved action; no API request or
-          page navigation occurs. These settings are included in the exported
-          draft for AI implementation.
+          저장한 동작을 모의 실행합니다. 실제 API 요청이나 페이지 이동은
+          일어나지 않습니다. 이 설정은 AI 구현을 위한 편집안에 포함됩니다.
         </p>
       </div>
     </fieldset>

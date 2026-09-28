@@ -16,7 +16,7 @@ export class RevisionConflict extends Error {}
 async function safePath(path: string) {
   try {
     if ((await lstat(path)).isSymbolicLink())
-      throw new Error("Symlink draft paths are not allowed");
+      throw new Error("편집안 경로에 심볼릭 링크를 사용할 수 없습니다");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
@@ -38,7 +38,7 @@ export async function readDraft(root: string): Promise<Draft> {
     return draft;
   } catch {
     throw new Error(
-      "Saved draft is corrupt. Original file preserved; inspect .tweakloom/draft.json and draft.backup.json.",
+      "저장된 편집안이 손상되었습니다. 원본은 보존됩니다. .tweakloom/draft.json과 draft.backup.json을 확인하세요.",
     );
   }
 }
@@ -59,7 +59,7 @@ export async function saveDraft(
         draft.revision !== expectedRevision
       )
         throw new RevisionConflict(
-          "A newer draft exists. Reload saved draft before saving.",
+          "더 최신 편집안이 있습니다. 저장된 편집안을 다시 불러온 뒤 저장하세요.",
         );
       await mkdir(root, { recursive: true });
       await safePath(join(root, "draft.backup.json"));

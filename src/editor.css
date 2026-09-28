@@ -1,5 +1,7 @@
 :root {
   font-family:
+    "맑은 고딕",
+    "Malgun Gothic",
     Inter,
     -apple-system,
     BlinkMacSystemFont,
@@ -1214,4 +1216,13 @@ select:focus-visible {
   height: auto;
   padding-top: 10px;
   padding-bottom: 10px;
+}
+
+/* Keep Korean instructions readable in narrow inspector panels. */
+.field-hint,
+.library-hint,
+.request-notice,
+.simulation-note {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }

@@ -9,11 +9,11 @@ test("undo works from preview keyboard focus, redo works, and history survives s
 }) => {
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
   await page
-    .getByLabel("Left component library")
-    .getByRole("button", { name: "Insert Button", exact: true })
+    .getByLabel("왼쪽 컴포넌트 목록")
+    .getByRole("button", { name: "버튼 추가", exact: true })
     .click();
   const button = page
     .frameLocator("iframe")
@@ -23,15 +23,15 @@ test("undo works from preview keyboard focus, redo works, and history survives s
   await expect(button).toHaveCount(0);
   await page.keyboard.press("Control+Shift+z");
   await expect(button).toHaveCount(1);
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
   await expect(button).toHaveCount(0);
   await page.reload();
-  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await page.getByRole("button", { name: "다시 실행", exact: true }).click();
   await expect(button).toHaveCount(1);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
@@ -42,10 +42,10 @@ test("duplicate Apply does not consume an undo step", async ({ page }) => {
     .frameLocator("iframe")
     .locator('[data-tweakloom-id="hero-title"]');
   await title.click();
-  await page.getByLabel("Text color", { exact: true }).fill("#123456");
-  await page.getByRole("button", { name: "Apply color", exact: true }).click();
-  await page.getByRole("button", { name: "Apply color", exact: true }).click();
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByLabel("글자색", { exact: true }).fill("#123456");
+  await page.getByRole("button", { name: "글자색 적용", exact: true }).click();
+  await page.getByRole("button", { name: "글자색 적용", exact: true }).click();
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
   await expect(title).toHaveCSS("color", "rgb(41, 42, 38)");
 });
 
@@ -54,42 +54,40 @@ test("grid columns have visible guides, parent controls and undoable fill sizing
 }) => {
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
-  const library = page.getByLabel("Left component library");
+  const library = page.getByLabel("왼쪽 컴포넌트 목록");
   await library
-    .getByRole("button", { name: "Insert Grid", exact: true })
+    .getByRole("button", { name: "그리드 추가", exact: true })
     .click();
   const preview = page.frameLocator("iframe"),
     grid = preview.locator('[data-tweakloom-preset="grid"]');
-  await expect(preview.getByLabel("Grid guides")).toBeVisible();
-  await page.getByLabel("Grid column count").selectOption("3");
+  await expect(preview.getByLabel("그리드 가이드")).toBeVisible();
+  await page.getByLabel("그리드 열 수").selectOption("3");
   await expect(
-    preview.getByLabel("Grid guides").locator(":scope > div"),
+    preview.getByLabel("그리드 가이드").locator(":scope > div"),
   ).toHaveCount(3);
-  await page.getByLabel("Frame gap", { exact: true }).fill("24");
+  await page.getByLabel("프레임 간격", { exact: true }).fill("24");
   await page
-    .getByRole("button", { name: "Apply frame gap", exact: true })
+    .getByRole("button", { name: "프레임 간격 적용", exact: true })
     .click();
   await expect(grid).toHaveCSS("gap", "24px");
-  await library
-    .getByRole("button", { name: "Insert Button", exact: true })
-    .click();
+  await library.getByRole("button", { name: "버튼 추가", exact: true }).click();
   const button = grid.locator('[data-tweakloom-preset="button"]');
-  await page.getByRole("button", { name: "Fill width", exact: true }).click();
+  await page.getByRole("button", { name: "너비 채우기", exact: true }).click();
   await expect(button).toHaveAttribute("style", /width: 100%/);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
   await expect(button).toHaveAttribute("style", /width: fit-content/);
   await page
-    .getByRole("button", { name: "Edit parent layout", exact: true })
+    .getByRole("button", { name: "상위 프레임 배치 수정", exact: true })
     .click();
-  await expect(page.getByLabel("Grid column count")).toHaveValue("3");
+  await expect(page.getByLabel("그리드 열 수")).toHaveValue("3");
   await page
-    .getByLabel("Frame distribution", { exact: true })
+    .getByLabel("프레임 공간 배분", { exact: true })
     .selectOption("center");
   await expect(grid).toHaveCSS("justify-items", "center");
   const cell = (await preview
-    .getByLabel("Grid guides")
+    .getByLabel("그리드 가이드")
     .locator(":scope > div")
     .first()
     .boundingBox())!;
@@ -97,8 +95,8 @@ test("grid columns have visible guides, parent controls and undoable fill sizing
   expect(
     Math.abs(centered.x + centered.width / 2 - cell.x - cell.width / 2),
   ).toBeLessThan(2);
-  await page.getByLabel("Grid guides", { exact: true }).uncheck();
-  await expect(preview.getByLabel("Grid guides")).toBeHidden();
+  await page.getByLabel("그리드 가이드", { exact: true }).uncheck();
+  await expect(preview.getByLabel("그리드 가이드")).toBeHidden();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
@@ -107,23 +105,19 @@ test("row drop position follows horizontal order above vertically centered items
 }) => {
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
-  const library = page.getByLabel("Left component library");
-  await library
-    .getByRole("button", { name: "Insert Row", exact: true })
-    .click();
-  await library
-    .getByRole("button", { name: "Insert Button", exact: true })
-    .click();
+  const library = page.getByLabel("왼쪽 컴포넌트 목록");
+  await library.getByRole("button", { name: "가로 추가", exact: true }).click();
+  await library.getByRole("button", { name: "버튼 추가", exact: true }).click();
   const row = page
     .frameLocator("iframe")
     .locator('[data-tweakloom-preset="row"]');
   await row.scrollIntoViewIfNeeded();
-  await page.getByRole("tab", { name: "Insert", exact: true }).click();
+  await page.getByRole("tab", { name: "추가", exact: true }).click();
   const source = (await page
-    .getByLabel("Right component library")
-    .getByRole("button", { name: "Insert Heading", exact: true })
+    .getByLabel("오른쪽 컴포넌트 목록")
+    .getByRole("button", { name: "제목 추가", exact: true })
     .boundingBox())!;
   const box = (await row.boundingBox())!;
   await page.mouse.move(source.x + 20, source.y + 20);

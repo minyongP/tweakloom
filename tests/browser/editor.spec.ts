@@ -12,23 +12,23 @@ test("edits a draft, restores it after reload and never changes source", async (
   const source = await readFile("src/demo.tsx", "utf8");
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
   const preview = page.frameLocator("iframe");
   await preview
     .getByRole("heading", { name: "Make room for good work." })
     .click();
-  await page.getByLabel("Text content").fill("A little more room.");
-  await page.getByRole("button", { name: "Apply text", exact: true }).click();
-  await page.getByLabel("Padding (px)").fill("32");
-  await page.getByRole("button", { name: "Apply padding" }).click();
+  await page.getByLabel("텍스트 내용").fill("A little more room.");
+  await page.getByRole("button", { name: "텍스트 적용", exact: true }).click();
+  await page.getByLabel("안쪽 여백 (px)").fill("32");
+  await page.getByRole("button", { name: "안쪽 여백 적용" }).click();
   await expect(preview.locator('[data-tweakloom-id="hero-title"]')).toHaveCSS(
     "padding",
     "32px",
   );
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(
@@ -51,18 +51,18 @@ test("flags missing or ambiguous targets and changed baselines without overwriti
   await preview
     .getByRole("heading", { name: "Make room for good work." })
     .click();
-  await page.getByLabel("Text content").fill("Draft title");
-  await page.getByRole("button", { name: "Apply text", exact: true }).click();
+  await page.getByLabel("텍스트 내용").fill("Draft title");
+  await page.getByRole("button", { name: "텍스트 적용", exact: true }).click();
   const frame = page.frames().find((f) => f.url().includes("/demo.html"))!;
   await frame.evaluate(() => {
     document.querySelector('[data-tweakloom-id="hero-title"]')!.textContent =
       "Changed by app";
   });
-  await expect(page.getByRole("alert")).toContainText("changed in the app");
+  await expect(page.getByRole("alert")).toContainText("변경되었습니다");
   await expect(
     preview.getByRole("heading", { name: "Changed by app" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Reload preview" }).click();
+  await page.getByRole("button", { name: "미리보기 새로고침" }).click();
   await expect(
     preview.getByRole("heading", { name: "Draft title" }),
   ).toBeVisible();
@@ -71,8 +71,8 @@ test("flags missing or ambiguous targets and changed baselines without overwriti
     const el = document.querySelector('[data-tweakloom-id="hero-title"]')!;
     el.parentElement!.append(el.cloneNode(true));
   });
-  await expect(page.getByRole("alert")).toContainText("ambiguous");
-  await page.getByRole("button", { name: "Reload preview" }).click();
+  await expect(page.getByRole("alert")).toContainText("ID가 중복됩니다");
+  await page.getByRole("button", { name: "미리보기 새로고침" }).click();
   await expect(
     preview.getByRole("heading", { name: "Draft title" }),
   ).toBeVisible();
@@ -82,7 +82,7 @@ test("flags missing or ambiguous targets and changed baselines without overwriti
     .evaluate(() =>
       document.querySelector('[data-tweakloom-id="hero-title"]')!.remove(),
     );
-  await expect(page.getByRole("alert")).toContainText("missing");
+  await expect(page.getByRole("alert")).toContainText("찾을 수 없습니다");
 });
 
 test("rejects unauthenticated writes and ignores messages from the wrong window", async ({
@@ -98,7 +98,7 @@ test("rejects unauthenticated writes and ignores messages from the wrong window"
   ).toBe(403);
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
   await page.evaluate(() =>
     window.postMessage(
@@ -107,7 +107,7 @@ test("rejects unauthenticated writes and ignores messages from the wrong window"
     ),
   );
   await expect(
-    page.getByText("Select something to start", { exact: true }),
+    page.getByText("편집할 요소를 선택하세요", { exact: true }),
   ).toBeVisible();
 });
 
@@ -119,8 +119,8 @@ test("keeps an unsaved draft through reload and actual Vite source updates", asy
   await preview
     .getByRole("heading", { name: "Make room for good work." })
     .click();
-  await page.getByLabel("Text content").fill("Keep my unsaved draft");
-  await page.getByRole("button", { name: "Apply text", exact: true }).click();
+  await page.getByLabel("텍스트 내용").fill("Keep my unsaved draft");
+  await page.getByRole("button", { name: "텍스트 적용", exact: true }).click();
   await expect(
     preview.getByRole("heading", { name: "Keep my unsaved draft" }),
   ).toBeVisible();
@@ -129,7 +129,7 @@ test("keeps an unsaved draft through reload and actual Vite source updates", asy
     preview.getByRole("heading", { name: "Keep my unsaved draft" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Unsaved changes", { exact: true }),
+    page.getByText("저장하지 않은 변경", { exact: true }),
   ).toBeVisible();
   const original = await readFile("src/demo.tsx", "utf8");
   try {
@@ -143,9 +143,9 @@ test("keeps an unsaved draft through reload and actual Vite source updates", asy
     await expect(
       preview.getByRole("heading", { name: "New title from React source" }),
     ).toBeVisible();
-    await expect(page.getByRole("alert")).toContainText("changed in the app");
+    await expect(page.getByRole("alert")).toContainText("변경되었습니다");
     await expect(
-      page.getByText("Unsaved changes", { exact: true }),
+      page.getByText("저장하지 않은 변경", { exact: true }),
     ).toBeVisible();
   } finally {
     await writeFile("src/demo.tsx", original);
@@ -160,37 +160,37 @@ test("undo refreshes inspector values, and child styles survive removing a paren
   await preview
     .getByRole("heading", { name: "Make room for good work." })
     .click();
-  await page.getByLabel("Text color", { exact: true }).fill("#112233");
-  await page.getByRole("button", { name: "Apply color", exact: true }).click();
+  await page.getByLabel("글자색", { exact: true }).fill("#112233");
+  await page.getByRole("button", { name: "글자색 적용", exact: true }).click();
   await expect(preview.locator('[data-tweakloom-id="hero-title"]')).toHaveCSS(
     "color",
     "rgb(17, 34, 51)",
   );
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(page.getByLabel("Text color", { exact: true })).toHaveValue(
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
+  await expect(page.getByLabel("글자색", { exact: true })).toHaveValue(
     "#292a26",
   );
-  await page.getByRole("button", { name: /card notes/i }).click();
-  await page.getByLabel("Text color", { exact: true }).fill("#112233");
-  await page.getByRole("button", { name: "Apply color", exact: true }).click();
+  await page.getByRole("button", { name: /노트 카드/ }).click();
+  await page.getByLabel("글자색", { exact: true }).fill("#112233");
+  await page.getByRole("button", { name: "글자색 적용", exact: true }).click();
   await expect(preview.locator('[data-tweakloom-id="notes-title"]')).toHaveCSS(
     "color",
     "rgb(17, 34, 51)",
   );
   await preview.getByRole("heading", { name: "A place for ideas" }).click();
   await expect(
-    page.getByRole("heading", { name: "notes title", exact: true }),
+    page.getByRole("heading", { name: "노트 제목", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Text color", { exact: true }).fill("#554433");
-  await page.getByRole("button", { name: "Apply color", exact: true }).click();
+  await page.getByLabel("글자색", { exact: true }).fill("#554433");
+  await page.getByRole("button", { name: "글자색 적용", exact: true }).click();
   await expect(preview.locator('[data-tweakloom-id="notes-title"]')).toHaveCSS(
     "color",
     "rgb(85, 68, 51)",
   );
   await page
-    .getByRole("button", { name: "Remove card-notes:color", exact: true })
+    .getByRole("button", { name: "변경 삭제 card-notes:color", exact: true })
     .click();
-  await page.getByRole("button", { name: "Reload preview" }).click();
+  await page.getByRole("button", { name: "미리보기 새로고침" }).click();
   await expect(preview.locator('[data-tweakloom-id="notes-title"]')).toHaveCSS(
     "color",
     "rgb(85, 68, 51)",
@@ -208,7 +208,7 @@ test("preserves Korean characters split across HTTP chunks", async ({
   });
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
   const body = Buffer.from(
     JSON.stringify({
@@ -263,7 +263,7 @@ test("locks editing while a saved draft reload is in flight", async ({
     .frameLocator("iframe")
     .getByRole("heading", { name: "Make room for good work." })
     .click();
-  await expect(page.getByLabel("Text content")).toBeVisible();
+  await expect(page.getByLabel("텍스트 내용")).toBeVisible();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -273,12 +273,12 @@ test("locks editing while a saved draft reload is in flight", async ({
     await route.continue();
   });
   await page
-    .getByRole("button", { name: "Reload saved draft", exact: true })
+    .getByRole("button", { name: "저장된 편집안 불러오기", exact: true })
     .click();
   try {
-    await expect(page.getByLabel("Text content")).toBeDisabled();
+    await expect(page.getByLabel("텍스트 내용")).toBeDisabled();
   } finally {
     release();
   }
-  await expect(page.getByLabel("Text content")).toBeEnabled();
+  await expect(page.getByLabel("텍스트 내용")).toBeEnabled();
 });

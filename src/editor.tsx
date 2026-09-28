@@ -14,7 +14,12 @@ import type {
   Operation,
   Placement,
 } from "./shared/draft.ts";
-import { presets } from "./shared/catalog.ts";
+import {
+  presets,
+  styleFields,
+  optionLabels,
+  elementLabels,
+} from "./shared/catalog.ts";
 import type { PresetId } from "./shared/catalog.ts";
 import { Library } from "./library.tsx";
 import { Inspector, Actions } from "./inspector.tsx";
@@ -39,7 +44,8 @@ async function requestDraft(
       : {}),
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error ?? "Could not save draft");
+  if (!response.ok)
+    throw new Error(result.error ?? "편집안을 저장하지 못했습니다");
   validateDraft(result);
   return result;
 }
@@ -58,9 +64,9 @@ function App() {
   const [generation, setGeneration] = useState(0);
   const [history, setHistory] = useState<Operation[][]>([]);
   const [future, setFuture] = useState<Operation[][]>([]);
-  const [rightTab, setRightTab] = useState<
-    "Design" | "Actions" | "Insert" | "Requests"
-  >("Design");
+  const [rightTab, setRightTab] = useState<"디자인" | "동작" | "추가" | "요청">(
+    "디자인",
+  );
   const [requestStart, setRequestStart] = useState<{
     element: ElementInfo;
     intent: "create" | "modify";
@@ -96,10 +102,10 @@ function App() {
           restored = cached;
           if (cached.revision !== value.revision)
             warning =
-              "Saved draft changed in another tab. Your recovered edits are kept; export them or reload the saved draft.";
+              "다른 탭에서 저장된 편집안이 바뀌었습니다. 복구한 변경은 유지됩니다. 내보내거나 저장된 편집안을 다시 불러오세요.";
         } catch {
           warning =
-            "Browser recovery data is invalid. The saved file was loaded.";
+            "브라우저 복구 데이터가 올바르지 않아 저장된 파일을 불러왔습니다.";
         }
       }
       if (!recover) sessionStorage.removeItem(recoveryKey);
@@ -116,7 +122,7 @@ function App() {
                 (stack) => Array.isArray(stack) && stack.length <= 50,
               )
             )
-              throw new Error("Invalid history");
+              throw new Error("잘못된 변경 이력입니다");
             for (const operations of [...cached.past, ...cached.future])
               validateDraft({ ...emptyDraft(), operations });
             past = cached.past;
@@ -124,7 +130,7 @@ function App() {
           }
         } catch {
           warning ||=
-            "Undo history could not be recovered. Your draft is kept.";
+            "되돌리기 이력을 복구하지 못했습니다. 편집안은 유지됩니다.";
         }
       setDraft(restored);
       setSavedOperations(JSON.stringify(value.operations));
@@ -185,7 +191,7 @@ function App() {
         const element = elements.find((el) => el.id === event.data.id);
         if (element) {
           setRequestStart({ element, intent: "modify" });
-          setRightTab("Requests");
+          setRightTab("요청");
         }
       }
       if (event.data.type === "history-request") {
@@ -266,7 +272,7 @@ function App() {
       );
     } catch {
       setError(
-        "Browser recovery storage is unavailable. Save the draft before refreshing.",
+        "브라우저 복구 저장소를 사용할 수 없습니다. 새로고침 전에 편집안을 저장하세요.",
       );
     }
   }, [draft, loaded, dirty, history, future]);
@@ -315,11 +321,11 @@ function App() {
                 : (selected?.parentId ?? "draft-board")),
           );
     if (!element) {
-      setError("Select a component on the page first.");
+      setError("화면에서 컴포넌트를 먼저 선택하세요.");
       return;
     }
     setRequestStart({ element, intent });
-    setRightTab("Requests");
+    setRightTab("요청");
     setError("");
   }
   function undo() {
@@ -357,10 +363,10 @@ function App() {
   }
   function checkContainer(id: string, tag: string) {
     const container = elements.find((el) => el.id === id);
-    if (!container?.container) throw new Error("Select an insertion frame.");
+    if (!container?.container) throw new Error("추가할 프레임을 선택하세요.");
     if (container.accepts && !container.accepts.includes(tag))
       throw new Error(
-        `${id} accepts ${container.accepts.join(", ")} components only.`,
+        `${id}: ${container.accepts.join(", ")} 컴포넌트만 허용됩니다.`,
       );
   }
   function insert(
@@ -404,7 +410,7 @@ function App() {
           { parentId: parent, beforeId },
         );
       change(operations);
-      setRightTab("Design");
+      setRightTab("디자인");
       setError("");
     } catch (e) {
       pendingSelect.current = null;
@@ -440,58 +446,58 @@ function App() {
       <header className="app-header">
         <div className="wordmark">
           <span className="logo">t</span>tweakloom
-          <span className="stage">EARLY BUILD</span>
+          <span className="stage">개발 버전</span>
         </div>
         <div className="project-name">
           <span className="project-icon">▧</span> Studio Supply{" "}
-          <span className="muted">/ visual draft</span>
+          <span className="muted">/ 화면 편집안</span>
         </div>
         <div className="header-actions">
           <button
-            aria-label="New component request"
+            aria-label="컴포넌트 생성 요청"
             disabled={!connected || saving || reloading}
             onClick={() => startRequest("create")}
           >
-            ✦ New component
+            ✦ 새 컴포넌트
           </button>
           <button
-            aria-label="Undo"
-            title="Undo (Ctrl/Cmd+Z)"
+            aria-label="되돌리기"
+            title="되돌리기 (Ctrl/Cmd+Z)"
             disabled={!history.length || saving || reloading}
             onClick={undo}
           >
-            ↶ Undo
+            ↶ 되돌리기
           </button>
           <button
-            aria-label="Redo"
-            title="Redo (Ctrl/Cmd+Shift+Z)"
+            aria-label="다시 실행"
+            title="다시 실행 (Ctrl/Cmd+Shift+Z)"
             disabled={!future.length || saving || reloading}
             onClick={redo}
           >
-            ↷ Redo
+            ↷ 다시 실행
           </button>
           <span className="save-state" aria-live="polite">
             {saving
-              ? "Saving…"
+              ? "저장 중…"
               : dirty
-                ? "Unsaved changes"
+                ? "저장하지 않은 변경"
                 : loaded
-                  ? `Saved · revision ${draft.revision}`
-                  : "Loading draft…"}
+                  ? `저장됨 · 버전 ${draft.revision}`
+                  : "편집안 불러오는 중…"}
           </span>
           <button
             className="primary"
             onClick={save}
             disabled={!loaded || saving || reloading || !dirty}
           >
-            Save draft
+            편집안 저장
           </button>
         </div>
       </header>
       <div className="workspace">
-        <aside className="layers" aria-label="Elements">
+        <aside className="layers" aria-label="요소 목록">
           <div className="panel-heading">
-            <span>COMPONENTS</span>
+            <span>컴포넌트</span>
             <span className="count">{presets.length}</span>
           </div>
           <Library
@@ -501,11 +507,11 @@ function App() {
             insert={insert}
           />
           <div className="panel-heading">
-            <span>PAGE ELEMENTS</span>
+            <span>페이지 요소</span>
             <span className="count">{elements.length}</span>
           </div>
           <div className="page-label">
-            ▧ <span>Home page</span>
+            ▧ <span>홈 페이지</span>
             <span className="muted">↗</span>
           </div>
           <div className="element-list">
@@ -524,18 +530,20 @@ function App() {
                 <span className="tag-icon">
                   {el.tag.startsWith("h") ? "T" : el.leaf ? "≡" : "▣"}
                 </span>
-                <span>{el.id.replaceAll("-", " ")}</span>
+                <span>
+                  {elementLabels[el.id] ?? el.id.replaceAll("-", " ")}
+                </span>
               </button>
             ))}
           </div>
           <div className="sidebar-note">
-            <span className="tiny-label">YOUR CODE STAYS YOURS</span>
+            <span className="tiny-label">원본 코드 보존</span>
             <p>
-              Make a draft here.
+              여기서 편집안을 만들어 보세요.
               <br />
-              Your source stays untouched.
+              원본 코드는 그대로 유지됩니다.
             </p>
-            <span className="phase-label">Visual workspace · React demo</span>
+            <span className="phase-label">화면 편집기 · React 데모</span>
           </div>
         </aside>
         <main className="canvas-area">
@@ -544,13 +552,13 @@ function App() {
               <span className="mode-indicator">↖</span>
               <strong>
                 {simulate
-                  ? "Preview actions"
+                  ? "동작 미리보기"
                   : freeMove
-                    ? "Free move"
-                    : "Auto layout"}
+                    ? "자유 이동"
+                    : "자동 배치"}
               </strong>
               <span className="toolbar-divider" />
-              <span className="muted">Click to select · drag to move</span>
+              <span className="muted">클릭으로 선택 · 드래그로 이동</span>
             </div>
             <div className="canvas-options">
               <label>
@@ -559,15 +567,15 @@ function App() {
                   checked={showGrid}
                   onChange={(e) => setShowGrid(e.target.checked)}
                 />
-                Grid guides
+                그리드 가이드
               </label>
               <select
-                aria-label="Drag behavior"
+                aria-label="드래그 방식"
                 value={freeMove ? "free" : "flow"}
                 onChange={(e) => setFreeMove(e.target.value === "free")}
               >
-                <option value="flow">Arrange components</option>
-                <option value="free">Free move (advanced)</option>
+                <option value="flow">자동 배치로 이동</option>
+                <option value="free">자유 이동 (고급)</option>
               </select>
               {freeMove && (
                 <label>
@@ -576,7 +584,7 @@ function App() {
                     checked={snap}
                     onChange={(e) => setSnap(e.target.checked)}
                   />
-                  8px grid
+                  8px 격자
                 </label>
               )}
               <label>
@@ -588,7 +596,7 @@ function App() {
                     setSimulation("");
                   }}
                 />
-                Preview actions
+                동작 미리보기
               </label>
             </div>
             <button
@@ -599,12 +607,12 @@ function App() {
                 setGeneration((n) => n + 1);
               }}
             >
-              ↻ <span>Reload preview</span>
+              ↻ <span>미리보기 새로고침</span>
             </button>
           </div>
           <div className="canvas-scroll">
             <div className="canvas-label">
-              <span>HOME / DESKTOP</span>
+              <span>홈 / 데스크톱</span>
               <span>
                 React + Vite <span className="dot">●</span>
               </span>
@@ -619,50 +627,47 @@ function App() {
                 <iframe
                   key={generation}
                   ref={iframe}
-                  title="Editable frontend preview"
+                  title="편집 가능한 화면 미리보기"
                   src={`/demo.html#tweakloom=${channel}`}
                   onLoad={() => send({ type: "draft", draft: latest.current })}
                 />
               )}
             </div>
-            <p className="canvas-hint">A real page. A safe place to explore.</p>
+            <p className="canvas-hint">실제 화면에서 편집안을 시험해 보세요.</p>
           </div>
           <div className="canvas-footer">
             <span>
               <i className={connected ? "status-dot online" : "status-dot"} />
-              {connected ? "Preview connected" : "Connecting preview…"}
+              {connected ? "미리보기 연결됨" : "미리보기 연결 중…"}
             </span>
             <span>
-              {draft.operations.length} draft change
-              {draft.operations.length === 1 ? "" : "s"}
-              <span className="footer-separator">·</span>Source unchanged
+              변경 {draft.operations.length}개
+              <span className="footer-separator">·</span>원본 변경 없음
             </span>
           </div>
         </main>
-        <aside className="inspector" aria-label="Inspector">
+        <aside className="inspector" aria-label="속성 패널">
           <div
             className="inspector-tabs"
             role="tablist"
-            aria-label="Inspector sections"
+            aria-label="속성 패널 탭"
           >
-            {(["Design", "Actions", "Insert", "Requests"] as const).map(
-              (tab) => (
-                <button
-                  key={tab}
-                  role="tab"
-                  aria-selected={rightTab === tab}
-                  onClick={() => {
-                    setRightTab(tab);
-                    if (tab === "Requests" && selected && !requestStart)
-                      startRequest("modify");
-                  }}
-                >
-                  {tab}
-                </button>
-              ),
-            )}
+            {(["디자인", "동작", "추가", "요청"] as const).map((tab) => (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={rightTab === tab}
+                onClick={() => {
+                  setRightTab(tab);
+                  if (tab === "요청" && selected && !requestStart)
+                    startRequest("modify");
+                }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-          <div hidden={rightTab !== "Requests"}>
+          <div hidden={rightTab !== "요청"}>
             <Requests
               draft={draft}
               start={requestStart}
@@ -676,7 +681,7 @@ function App() {
                     )
                   )
                     throw new Error(
-                      "Request target is no longer available. Select it again.",
+                      "요청 대상을 찾을 수 없습니다. 다시 선택하세요.",
                     );
                   change(upsertOperation(draft.operations, op));
                   setError("");
@@ -691,14 +696,14 @@ function App() {
               onModify={() => startRequest("modify")}
             />
           </div>
-          {rightTab === "Requests" ? null : rightTab === "Insert" ? (
+          {rightTab === "요청" ? null : rightTab === "추가" ? (
             <Library
               side="Right"
               channel={channel}
               disabled={!connected || saving || reloading || simulate}
               insert={insert}
             />
-          ) : selected && rightTab === "Actions" ? (
+          ) : selected && rightTab === "동작" ? (
             <Actions
               key={`${selected.id}:${draft.operations.find((op) => op.targetId === selected.id && op.kind === "interaction")?.after ?? ""}`}
               element={selected}
@@ -739,23 +744,20 @@ function App() {
           ) : (
             <div className="empty-inspector">
               <div className="cursor-glyph">↖</div>
-              <h2>Select something to start</h2>
-              <p>
-                Click the page or choose an element from the list. Then make it
-                yours.
-              </p>
+              <h2>편집할 요소를 선택하세요</h2>
+              <p>화면을 클릭하거나 왼쪽 목록에서 요소를 선택해 수정하세요.</p>
             </div>
           )}
           <section className="changes">
             <div className="changes-heading">
               <h2>
-                Draft changes{" "}
+                변경 사항{" "}
                 <span className="count">{draft.operations.length}</span>
               </h2>
-              <span className="muted">{history.length} undo steps</span>
+              <span className="muted">{history.length}단계 되돌리기</span>
             </div>
             {!draft.operations.length && (
-              <p className="muted">Your adjustments will appear here.</p>
+              <p className="muted">수정한 내용이 여기에 표시됩니다.</p>
             )}
             {draft.operations.map((op) => (
               <div className="change" key={operationKey(op)}>
@@ -763,16 +765,26 @@ function App() {
                 <div>
                   <strong>{op.targetId}</strong>
                   <p>
-                    {op.kind === "style" ? op.property : op.kind} →{" "}
+                    {op.kind === "style"
+                      ? styleFields[op.property].label
+                      : {
+                          text: "텍스트",
+                          options: "선택 항목",
+                          interaction: "동작",
+                          move: "이동",
+                          insert: "추가",
+                          request: "요청",
+                        }[op.kind]}{" "}
+                    →{" "}
                     {op.kind === "request"
-                      ? "Component request"
+                      ? "컴포넌트 요청"
                       : op.kind === "interaction"
-                        ? "Click action"
-                        : op.after || "(empty)"}
+                        ? "클릭 동작"
+                        : (optionLabels[op.after] ?? op.after) || "(비어 있음)"}
                   </p>
                 </div>
                 <button
-                  aria-label={`Remove ${operationKey(op)}`}
+                  aria-label={`변경 삭제 ${operationKey(op)}`}
                   disabled={saving || reloading}
                   onClick={() => change(removeOperation(draft.operations, op))}
                 >
@@ -789,31 +801,33 @@ function App() {
                 !draft.operations.length || !!conflicts.length || !connected
               }
             >
-              Export draft JSON <span>↗</span>
+              편집안 JSON 내보내기 <span>↗</span>
             </button>
-            <p>Use Requests to prepare a Codex / Claude handoff.</p>
+            <p>요청 탭에서 Codex / Claude에 전달할 내용을 만드세요.</p>
             <button
               className="text-button"
               disabled={saving || reloading}
               onClick={() => {
                 if (
                   !dirty ||
-                  confirm("Discard unsaved edits and reload the saved draft?")
+                  confirm(
+                    "저장하지 않은 변경을 버리고 저장된 편집안을 불러올까요?",
+                  )
                 )
                   void load();
               }}
             >
-              Reload saved draft
+              저장된 편집안 불러오기
             </button>
           </div>
         </aside>
       </div>
       {simulation && (
-        <section className="simulation-result" aria-label="Action preview">
+        <section className="simulation-result" aria-label="동작 미리보기 결과">
           <div>
-            <strong>Action preview</strong>
+            <strong>동작 미리보기 결과</strong>
             <button
-              aria-label="Close action preview"
+              aria-label="동작 미리보기 닫기"
               onClick={() => setSimulation("")}
             >
               ×
@@ -825,12 +839,12 @@ function App() {
       {(error || conflicts.length > 0) && (
         <div className="error-banner" role="alert">
           <strong>
-            {error ? "Draft needs attention" : "Reconnect these changes"}
+            {error ? "편집안을 확인해 주세요" : "변경 대상을 확인해 주세요"}
           </strong>
           <span>{error || conflicts.join(" · ")}</span>
           <small>
-            Keep the draft. Remove the affected change or restore the original
-            app state before continuing.
+            편집안은 유지됩니다. 해당 변경을 삭제하거나 앱의 원래 상태를 복원한
+            뒤 계속하세요.
           </small>
         </div>
       )}

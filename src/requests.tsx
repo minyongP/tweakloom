@@ -67,7 +67,7 @@ export function Requests({
         return;
       setPrompt("");
       setEditing(null);
-      setNotice("Request added to draft. Save draft to keep it on disk.");
+      setNotice("요청을 추가했습니다. 파일에 보관하려면 편집안을 저장하세요.");
     } catch (e) {
       setNotice((e as Error).message);
     }
@@ -76,13 +76,11 @@ export function Requests({
     try {
       const text = buildHandoff(draft);
       await navigator.clipboard.writeText(text);
-      setNotice(
-        "Copied. Paste into Codex or Claude to request implementation.",
-      );
+      setNotice("복사했습니다. Codex나 Claude에 붙여 넣어 구현을 요청하세요.");
       setFallback("");
     } catch {
       setFallback(buildHandoff(draft));
-      setNotice("Clipboard unavailable. Copy the text below.");
+      setNotice("클립보드를 사용할 수 없습니다. 아래 내용을 직접 복사하세요.");
     }
   }
   function download() {
@@ -95,26 +93,26 @@ export function Requests({
     a.download = "tweakloom-ai-request.md";
     a.click();
     URL.revokeObjectURL(url);
-    setNotice("Downloaded a snapshot. No AI task has started.");
+    setNotice("전달문을 다운로드했습니다. AI 작업은 시작하지 않았습니다.");
   }
   return (
-    <section className="requests-panel" aria-label="Component requests">
-      <h2>Ask for a change</h2>
+    <section className="requests-panel" aria-label="컴포넌트 요청 목록">
+      <h2>AI에게 수정 요청</h2>
       <p className="field-hint">
-        Select something on the page, then describe the result you want.
+        화면에서 요소를 선택한 뒤 원하는 변경을 적어 주세요.
       </p>
       <fieldset disabled={disabled}>
         <div className="request-mode">
-          <button onClick={onModify}>Modify selected</button>
-          <button onClick={onNew}>Create in frame</button>
+          <button onClick={onModify}>선택 요소 수정</button>
+          <button onClick={onNew}>프레임 안에 생성</button>
         </div>
-        <div className="request-target" aria-label="Request target">
+        <div className="request-target" aria-label="요청 대상">
           <strong>
-            {intent === "create" ? "Create component" : "Modify component"}
+            {intent === "create" ? "컴포넌트 생성" : "컴포넌트 수정"}
           </strong>
-          <span>{target?.id ?? "Select a component first"}</span>
+          <span>{target?.id ?? "먼저 컴포넌트를 선택하세요"}</span>
         </div>
-        <label htmlFor="change-request">Change request</label>
+        <label htmlFor="change-request">요청 내용</label>
         <textarea
           id="change-request"
           rows={5}
@@ -131,15 +129,15 @@ export function Requests({
           }}
         />
         <p className="field-hint">
-          The target is pinned above. Selecting another element does not
-          silently change this request.
+          요청 대상은 위 요소로 고정됩니다. 다른 요소를 선택해도 바뀌지
+          않습니다.
         </p>
         <button
           className="primary"
           disabled={!target || !prompt.trim()}
           onClick={save}
         >
-          {editing ? "Update request" : "Add request"}
+          {editing ? "요청 수정" : "요청 추가"}
         </button>
         {editing && (
           <button
@@ -149,7 +147,7 @@ export function Requests({
               setPrompt("");
             }}
           >
-            Cancel editing
+            수정 취소
           </button>
         )}
       </fieldset>
@@ -158,13 +156,13 @@ export function Requests({
           {notice}
         </p>
       )}
-      <div aria-label="Saved requests" className="request-list">
+      <div aria-label="작성한 요청" className="request-list">
         <h3>
-          Requests <span className="count">{requests.length}</span>
+          요청 <span className="count">{requests.length}</span>
         </h3>
         {!requests.length && (
           <p className="field-hint">
-            No requests yet. Your visual edits remain in the draft.
+            아직 요청이 없습니다. 화면에서 수정한 내용은 편집안에 유지됩니다.
           </p>
         )}
         {requests.map((op) => {
@@ -173,15 +171,15 @@ export function Requests({
             <article key={op.requestId}>
               <strong>
                 {request.intent === "create"
-                  ? "Create component"
-                  : "Modify component"}
+                  ? "컴포넌트 생성"
+                  : "컴포넌트 수정"}
               </strong>
               <small>{op.targetId}</small>
               <p>{request.prompt}</p>
               <div>
                 <button
                   disabled={disabled}
-                  aria-label="Edit request"
+                  aria-label="요청 편집"
                   onClick={() => {
                     setTarget(request.context);
                     setIntent(request.intent);
@@ -190,11 +188,11 @@ export function Requests({
                     setNotice("");
                   }}
                 >
-                  Edit
+                  편집
                 </button>
                 <button
                   disabled={disabled}
-                  aria-label="Remove request"
+                  aria-label="요청 삭제"
                   onClick={() => {
                     remove(op);
                     if (editing === op.requestId) {
@@ -203,7 +201,7 @@ export function Requests({
                     }
                   }}
                 >
-                  Remove
+                  삭제
                 </button>
               </div>
             </article>
@@ -215,22 +213,21 @@ export function Requests({
           disabled={disabled || blocked || !requests.length}
           onClick={() => void copy()}
         >
-          Copy for Codex / Claude
+          Codex / Claude 전달문 복사
         </button>
         <button
           disabled={disabled || blocked || !requests.length}
           onClick={download}
         >
-          Download AI request
+          AI 요청 다운로드
         </button>
         <p className="field-hint">
-          Includes requests, selected target snapshots and visual edits. This
-          prepares a handoff; it does not run AI or modify source. Resolve draft
-          conflicts before export.
+          요청, 대상 정보, 화면 변경 사항을 함께 전달합니다. AI 실행이나 코드
+          수정은 시작하지 않습니다. 충돌을 해결한 뒤 내보내세요.
         </p>
         {fallback && (
           <textarea
-            aria-label="AI handoff text"
+            aria-label="AI 전달문"
             rows={8}
             readOnly
             value={fallback}

@@ -8,6 +8,8 @@ Tweakloom is an open-source, local visual editing workspace being built for Code
 
 **Structured layout development preview.** The included React demo supports component libraries, automatic layout, drag-and-drop reordering, detailed styling, action specifications and component creation/modification requests. Codex/Claude plugins, MCP handoff and external project connections are not implemented yet.
 
+The editor interface, accessibility labels, validation messages and AI request handoff are in Korean. CSS values and draft keys stay unchanged for existing drafts. The sample storefront keeps its original content.
+
 ## Try the editor
 
 Requires **Node.js 24+** and npm.

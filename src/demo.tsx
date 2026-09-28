@@ -100,14 +100,14 @@ function Demo() {
         </section>
         <section className="draft-board-section">
           <div className="section-title">
-            <h2>Your draft board</h2>
-            <span>Drop components here</span>
+            <h2>편집 보드</h2>
+            <span>여기에 컴포넌트를 놓으세요</span>
           </div>
           <div
             id="draft-board"
             data-tweakloom-id="draft-board"
             data-tweakloom-container=""
-            aria-label="Draft board"
+            aria-label="편집 보드"
           />
         </section>
         <footer>

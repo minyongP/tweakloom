@@ -1,13 +1,13 @@
 import { presets } from "./shared/catalog.ts";
 export function createPreset(id: string): HTMLElement {
   const preset = presets.find((p) => p.id === id);
-  if (!preset) throw new Error("Unknown component");
+  if (!preset) throw new Error("알 수 없는 컴포넌트입니다");
   const el = document.createElement(preset.tag);
   el.dataset.tweakloomPreset = id;
   el.style.cssText =
     "box-sizing:border-box;margin:0;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#34333f;flex-shrink:0;";
   if (id === "button") {
-    el.textContent = "Button";
+    el.textContent = "버튼";
     (el as HTMLButtonElement).type = "button";
     Object.assign(el.style, {
       padding: "12px 24px",
@@ -19,11 +19,9 @@ export function createPreset(id: string): HTMLElement {
     });
   }
   if (id === "dropdown") {
-    el.setAttribute("aria-label", "Dropdown");
+    el.setAttribute("aria-label", "드롭다운");
     el.append(
-      ...["Option one", "Option two", "Option three"].map(
-        (text) => new Option(text, text),
-      ),
+      ...["항목 1", "항목 2", "항목 3"].map((text) => new Option(text, text)),
     );
     Object.assign(el.style, {
       padding: "10px 14px",
@@ -34,8 +32,8 @@ export function createPreset(id: string): HTMLElement {
     });
   }
   if (id === "input") {
-    (el as HTMLInputElement).placeholder = "Enter text…";
-    el.setAttribute("aria-label", "Text input");
+    (el as HTMLInputElement).placeholder = "텍스트를 입력하세요…";
+    el.setAttribute("aria-label", "텍스트 입력");
     Object.assign(el.style, {
       padding: "10px 14px",
       border: "1px solid #d8d2e4",
@@ -45,11 +43,11 @@ export function createPreset(id: string): HTMLElement {
     });
   }
   if (id === "heading") {
-    el.textContent = "Your next big idea";
+    el.textContent = "새로운 아이디어";
     Object.assign(el.style, { fontSize: "28px", fontWeight: "600" });
   }
   if (id === "paragraph") {
-    el.textContent = "A little space for your story.";
+    el.textContent = "여기에 내용을 입력하세요.";
     el.style.maxWidth = "320px";
   }
   if (id === "divider")
@@ -73,9 +71,9 @@ export function createPreset(id: string): HTMLElement {
       gap: "12px",
     });
     const title = document.createElement("strong");
-    title.textContent = "A fresh start";
+    title.textContent = "새로운 시작";
     const text = document.createElement("p");
-    text.textContent = "Add something worth sharing.";
+    text.textContent = "카드 설명을 입력하세요.";
     text.style.margin = "0";
     el.append(title, text);
   }

@@ -32,7 +32,7 @@ export default defineConfig({
             (req.headers.origin && req.headers.origin !== origin)
           ) {
             res.statusCode = 403;
-            res.end(JSON.stringify({ error: "Forbidden" }));
+            res.end(JSON.stringify({ error: "접근이 거부되었습니다" }));
             return;
           }
           try {
@@ -46,14 +46,14 @@ export default defineConfig({
               req.headers["content-type"] !== "application/json"
             ) {
               res.statusCode = 405;
-              res.end(JSON.stringify({ error: "Unsupported request" }));
+              res.end(JSON.stringify({ error: "지원하지 않는 요청입니다" }));
               return;
             }
             const chunks: Buffer[] = [];
             let bytes = 0;
             for await (const chunk of req) {
               bytes += chunk.length;
-              if (bytes > 100_000) throw new Error("Draft too large");
+              if (bytes > 100_000) throw new Error("편집안 크기가 너무 큽니다");
               chunks.push(chunk);
             }
             const input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -70,7 +70,7 @@ export default defineConfig({
                 error:
                   error instanceof Error
                     ? error.message
-                    : "Draft request failed",
+                    : "편집안 요청에 실패했습니다",
               }),
             );
           }

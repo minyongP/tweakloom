@@ -9,21 +9,17 @@ test("auto layout inserts without offsets, reorders, wraps and restores after sa
 }) => {
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Drag behavior")).toHaveValue("flow");
-  const library = page.getByLabel("Left component library");
+  await expect(page.getByLabel("드래그 방식")).toHaveValue("flow");
+  const library = page.getByLabel("왼쪽 컴포넌트 목록");
   const board = page.frameLocator("iframe").locator("#draft-board");
-  await library
-    .getByRole("button", { name: "Insert Button", exact: true })
-    .click();
-  await library
-    .getByRole("button", { name: "Insert Heading", exact: true })
-    .click();
+  await library.getByRole("button", { name: "버튼 추가", exact: true }).click();
+  await library.getByRole("button", { name: "제목 추가", exact: true }).click();
   await expect(
     board.locator(":scope > [data-tweakloom-preset]").first(),
   ).toHaveAttribute("data-tweakloom-preset", "button");
-  await page.getByRole("button", { name: "Move earlier", exact: true }).click();
+  await page.getByRole("button", { name: "앞으로 이동", exact: true }).click();
   await expect(
     board.locator(":scope > [data-tweakloom-preset]").first(),
   ).toHaveAttribute("data-tweakloom-preset", "heading");
@@ -31,14 +27,12 @@ test("auto layout inserts without offsets, reorders, wraps and restores after sa
     "translate",
     "none",
   );
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
   await expect(
     board.locator(":scope > [data-tweakloom-preset]").first(),
   ).toHaveAttribute("data-tweakloom-preset", "button");
-  await page.getByRole("button", { name: /draft board/i }).click();
-  await page
-    .getByRole("button", { name: "Column layout", exact: true })
-    .click();
+  await page.getByRole("button", { name: /편집 보드/ }).click();
+  await page.getByRole("button", { name: "세로 배치", exact: true }).click();
   await expect(board).toHaveCSS("flex-direction", "column");
   const a = (await board
     .locator('[data-tweakloom-preset="button"]')
@@ -47,9 +41,9 @@ test("auto layout inserts without offsets, reorders, wraps and restores after sa
     .locator('[data-tweakloom-preset="heading"]')
     .boundingBox())!;
   expect(b.y).toBeGreaterThanOrEqual(a.y + a.height + 17);
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(board).toHaveCSS("flex-direction", "column");
@@ -69,7 +63,7 @@ test("moves source siblings by dragging and restores exact order on Undo", async
   await page.mouse.move(a.x + 20, a.y + 20);
   await page.mouse.down();
   await page.mouse.move(b.x + 20, b.y + 2, { steps: 10 });
-  await expect(preview.getByLabel("Insertion guide")).toBeVisible();
+  await expect(preview.getByLabel("삽입 위치 가이드")).toBeVisible();
   await page.mouse.up();
   await expect(
     preview
@@ -77,7 +71,7 @@ test("moves source siblings by dragging and restores exact order on Undo", async
       .first(),
   ).toHaveAttribute("data-tweakloom-id", "hero-title");
   await expect(title).toHaveCSS("translate", "none");
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
   await expect(
     preview
       .locator('[data-tweakloom-id="hero-content"] > [data-tweakloom-id]')
@@ -90,12 +84,12 @@ test("container rules reject controls in a card collection", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: /collection cards/i }).click();
+  await page.getByRole("button", { name: /카드 목록/ }).click();
   await page
-    .getByLabel("Left component library")
-    .getByRole("button", { name: "Insert Button", exact: true })
+    .getByLabel("왼쪽 컴포넌트 목록")
+    .getByRole("button", { name: "버튼 추가", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText("accepts");
+  await expect(page.getByRole("alert")).toContainText("허용됩니다");
   await expect(
     page.frameLocator("iframe").locator('[data-tweakloom-preset="button"]'),
   ).toHaveCount(0);
@@ -106,20 +100,20 @@ test("drops new components into flow and moves them into a frame without losing 
 }) => {
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
-  const library = page.getByLabel("Right component library");
+  const library = page.getByLabel("오른쪽 컴포넌트 목록");
   const preview = page.frameLocator("iframe"),
     board = preview.locator("#draft-board");
   await page
-    .getByLabel("Left component library")
-    .getByRole("button", { name: "Insert Button", exact: true })
+    .getByLabel("왼쪽 컴포넌트 목록")
+    .getByRole("button", { name: "버튼 추가", exact: true })
     .click();
-  await page.getByRole("tab", { name: "Insert", exact: true }).click();
+  await page.getByRole("tab", { name: "추가", exact: true }).click();
   await board.scrollIntoViewIfNeeded();
   const first = board.locator('[data-tweakloom-preset="button"]');
   const source = (await library
-    .getByRole("button", { name: "Insert Heading", exact: true })
+    .getByRole("button", { name: "제목 추가", exact: true })
     .boundingBox())!;
   const target = (await first.boundingBox())!;
   await page.mouse.move(source.x + 20, source.y + 20);
@@ -131,10 +125,10 @@ test("drops new components into flow and moves them into a frame without losing 
     board.locator(":scope > [data-tweakloom-preset]").first(),
   ).toHaveAttribute("data-tweakloom-preset", "heading");
   await expect(first).toHaveCSS("translate", "none");
-  await page.getByRole("button", { name: /draft board/i }).click();
+  await page.getByRole("button", { name: /편집 보드/ }).click();
   await page
-    .getByLabel("Left component library")
-    .getByRole("button", { name: "Insert Frame", exact: true })
+    .getByLabel("왼쪽 컴포넌트 목록")
+    .getByRole("button", { name: "프레임 추가", exact: true })
     .click();
   const frame = board.locator('[data-tweakloom-preset="frame"]');
   await frame.scrollIntoViewIfNeeded();
@@ -148,9 +142,9 @@ test("drops new components into flow and moves them into a frame without losing 
     1,
   );
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(frame.locator('[data-tweakloom-preset="button"]')).toHaveCount(
@@ -173,8 +167,8 @@ test("moving a source element into a draft frame survives reload and frame remov
     title = preview.locator('[data-tweakloom-id="hero-title"]');
   await title.click();
   await page
-    .getByLabel("Left component library")
-    .getByRole("button", { name: "Insert Frame", exact: true })
+    .getByLabel("왼쪽 컴포넌트 목록")
+    .getByRole("button", { name: "프레임 추가", exact: true })
     .click();
   const frame = preview.locator('[data-tweakloom-preset="frame"]');
   const id = (await frame.getAttribute("data-tweakloom-id"))!;
@@ -188,19 +182,19 @@ test("moving a source element into a draft frame survives reload and frame remov
   await expect(frame.locator('[data-tweakloom-id="hero-title"]')).toHaveCount(
     1,
   );
-  await page.getByLabel("Text color", { exact: true }).fill("#123456");
-  await page.getByRole("button", { name: "Apply color", exact: true }).click();
+  await page.getByLabel("글자색", { exact: true }).fill("#123456");
+  await page.getByRole("button", { name: "글자색 적용", exact: true }).click();
   await expect(title).toHaveCSS("color", "rgb(18, 52, 86)");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(frame.locator('[data-tweakloom-id="hero-title"]')).toHaveCount(
     1,
   );
   await page
-    .getByRole("button", { name: `Remove ${id}:insert`, exact: true })
+    .getByRole("button", { name: `변경 삭제 ${id}:insert`, exact: true })
     .click();
   await expect(
     preview.locator(

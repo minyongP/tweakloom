@@ -15,26 +15,26 @@ export function Library({
 }) {
   const [query, setQuery] = useState("");
   const visible = presets.filter((p) =>
-    `${p.label} ${p.group}`.toLowerCase().includes(query.toLowerCase()),
+    `${p.label} ${p.group} ${p.id}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
     <section
       className="component-library"
-      aria-label={`${side} component library`}
+      aria-label={`${side === "Left" ? "왼쪽" : "오른쪽"} 컴포넌트 목록`}
     >
       <label className="library-search">
         <span>⌕</span>
         <input
-          aria-label={`${side} component search`}
-          placeholder="Find a component…"
+          aria-label={`${side === "Left" ? "왼쪽" : "오른쪽"} 컴포넌트 검색`}
+          placeholder="컴포넌트 검색…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
       </label>
       <p className="library-hint">
-        Drop between components. Layout takes care of spacing.
+        컴포넌트 사이에 놓으면 간격에 맞춰 배치됩니다.
       </p>
-      {["Controls", "Content", "Layout"].map((group) => (
+      {["입력 요소", "콘텐츠", "레이아웃"].map((group) => (
         <div className="library-group" key={group}>
           {visible.some((p) => p.group === group) && (
             <>
@@ -48,7 +48,7 @@ export function Library({
                       className="preset-card"
                       disabled={disabled}
                       draggable={!disabled}
-                      aria-label={`Insert ${preset.label}`}
+                      aria-label={`${preset.label} 추가`}
                       onClick={() => insert(preset.id)}
                       onDragStart={(event) => {
                         event.dataTransfer.setData(
@@ -63,15 +63,15 @@ export function Library({
                         aria-hidden="true"
                       >
                         {preset.id === "button" && (
-                          <span className="mini-button">Button ↗</span>
+                          <span className="mini-button">버튼 ↗</span>
                         )}
                         {preset.id === "dropdown" && (
                           <span className="mini-input">
-                            Select <b>⌄</b>
+                            선택 <b>⌄</b>
                           </span>
                         )}
                         {preset.id === "input" && (
-                          <span className="mini-input">Your text…</span>
+                          <span className="mini-input">텍스트…</span>
                         )}
                         {preset.id === "heading" && (
                           <strong className="mini-heading">Aa</strong>
@@ -91,8 +91,8 @@ export function Library({
                         {preset.id === "card" && (
                           <span className="mini-card">
                             <i />
-                            <b>Title</b>
-                            <em>Something good.</em>
+                            <b>제목</b>
+                            <em>설명을 입력하세요.</em>
                           </span>
                         )}
                         {preset.id === "frame" && (
@@ -116,9 +116,7 @@ export function Library({
           )}
         </div>
       ))}
-      {!visible.length && (
-        <p className="library-hint">No matching components.</p>
-      )}
+      {!visible.length && <p className="library-hint">검색 결과가 없습니다.</p>}
     </section>
   );
 }

@@ -41,19 +41,19 @@ function start(channel: string) {
   }[] = [];
   // Outside the observed app subtree so drawing the guide never triggers replay.
   const guide = document.createElement("div");
-  guide.setAttribute("aria-label", "Insertion guide");
+  guide.setAttribute("aria-label", "삽입 위치 가이드");
   guide.style.cssText =
     "display:none;position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #7956ce;background:#7956ce22;border-radius:3px;";
   document.documentElement.append(guide);
   const gridGuide = document.createElement("div");
-  gridGuide.setAttribute("aria-label", "Grid guides");
+  gridGuide.setAttribute("aria-label", "그리드 가이드");
   gridGuide.style.cssText =
     "display:none;position:fixed;pointer-events:none;z-index:2147483646;";
   document.documentElement.append(gridGuide);
   const askButton = document.createElement("button");
-  askButton.textContent = "✦ Ask AI";
+  askButton.textContent = "✦ AI에게 요청";
   askButton.type = "button";
-  askButton.setAttribute("aria-label", "Ask AI about selected component");
+  askButton.setAttribute("aria-label", "선택한 컴포넌트를 AI에게 요청");
   askButton.dataset.tweakloomRequestButton = "";
   askButton.style.cssText =
     "display:none;position:fixed;z-index:2147483647;margin:0;padding:7px 10px;background:#7956ce;color:white;border:0;border-radius:5px;font:12px Arial,sans-serif;box-shadow:0 2px 8px #0002;";
@@ -259,13 +259,13 @@ function start(channel: string) {
         )
           continue;
         if (candidates(op.targetId).length) {
-          conflicts.push(`${op.targetId}: ambiguous inserted target`);
+          conflicts.push(`${op.targetId}: 추가 대상 ID가 중복됩니다`);
           remaining.splice(i--, 1);
           continue;
         }
         if (!accepts(parents[0], op.tag)) {
           conflicts.push(
-            `${op.parentId}: accepts ${parents[0].dataset.tweakloomAccept} components only`,
+            `${op.parentId}: ${parents[0].dataset.tweakloomAccept} 컴포넌트만 허용됩니다`,
           );
           remaining.splice(i--, 1);
           continue;
@@ -280,9 +280,7 @@ function start(channel: string) {
       if (!progress) break;
     }
     for (const op of remaining)
-      conflicts.push(
-        `${op.targetId}: missing or ambiguous insertion container`,
-      );
+      conflicts.push(`${op.targetId}: 추가할 프레임이 없거나 ID가 중복됩니다`);
     baselines = new Map(
       [...document.querySelectorAll<HTMLElement>("[data-tweakloom-id]")].map(
         (el) => [el, info(el)],
@@ -293,7 +291,7 @@ function start(channel: string) {
       const matches = candidates(op.targetId);
       if (matches.length !== 1) {
         conflicts.push(
-          `${op.targetId}: ${matches.length ? "ambiguous target" : "missing target"}`,
+          `${op.targetId}: ${matches.length ? "대상 ID가 중복됩니다" : "대상을 찾을 수 없습니다"}`,
         );
         continue;
       }
@@ -305,7 +303,7 @@ function start(channel: string) {
           parseComponentRequest(op.after).intent === "create" &&
           !info(el).container)
       ) {
-        conflicts.push(`${op.targetId}: structure changed in the app`);
+        conflicts.push(`${op.targetId}: 앱에서 구조가 변경되었습니다`);
         continue;
       }
       if (op.kind === "interaction" || op.kind === "request") continue;
@@ -319,7 +317,7 @@ function start(channel: string) {
               ? baseline.styles[op.property]
               : "";
       if (current !== op.before) {
-        conflicts.push(`${op.targetId}: value changed in the app`);
+        conflicts.push(`${op.targetId}: 앱에서 값이 변경되었습니다`);
         continue;
       }
       const original = op.kind === "style" ? el.style[op.property] : current;
@@ -351,7 +349,7 @@ function start(channel: string) {
         (op.before && baselines.get(el)?.parentId !== op.before)
       ) {
         conflicts.push(
-          `${op.targetId}: layout target changed or violates container rules`,
+          `${op.targetId}: 배치 대상이 변경되었거나 프레임 규칙에 맞지 않습니다`,
         );
         continue;
       }
@@ -396,7 +394,7 @@ function start(channel: string) {
     if (!operation) {
       send({
         type: "simulation",
-        text: "No action configured for this element.",
+        text: "이 요소에 설정된 동작이 없습니다.",
       });
       return;
     }
@@ -405,8 +403,8 @@ function start(channel: string) {
       type: "simulation",
       text:
         action.type === "navigate"
-          ? `Navigation preview → ${action.destination}${action.newTab ? " (new tab)" : ""}. No page was opened.`
-          : `${action.method} ${action.url}\nMock status: ${action.responseStatus}\n${action.response || "(empty response)"}\nNo network request was sent.`,
+          ? `페이지 이동 미리보기 → ${action.destination}${action.newTab ? " (새 탭)" : ""}. 실제 페이지는 열리지 않았습니다.`
+          : `${action.method} ${action.url}\n모의 응답 상태: ${action.responseStatus}\n${action.response || "(빈 응답)"}\n실제 네트워크 요청은 보내지 않았습니다.`,
     });
   }
   window.addEventListener("message", (event) => {
@@ -427,7 +425,9 @@ function start(channel: string) {
         send({
           type: "error",
           error:
-            error instanceof Error ? error.message : "Invalid draft message",
+            error instanceof Error
+              ? error.message
+              : "잘못된 편집안 메시지입니다",
         });
       }
     } else if (
@@ -740,7 +740,7 @@ function start(channel: string) {
         else
           send({
             type: "error",
-            error: "Drop into a compatible frame or between its components.",
+            error: "허용된 프레임 안이나 컴포넌트 사이에 놓으세요.",
           });
         return;
       }
@@ -814,7 +814,7 @@ function start(channel: string) {
         else
           send({
             type: "error",
-            error: "Drop into a frame or the Draft board.",
+            error: "프레임이나 편집 보드에 놓으세요.",
           });
         return;
       }
@@ -823,7 +823,7 @@ function start(channel: string) {
           ? event.target.closest<HTMLElement>("[data-tweakloom-container]")
           : null;
       if (!container) {
-        send({ type: "error", error: "Drop into a frame or the Draft board." });
+        send({ type: "error", error: "프레임이나 편집 보드에 놓으세요." });
         return;
       }
       event.preventDefault();

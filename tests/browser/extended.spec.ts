@@ -9,57 +9,55 @@ test("inserts components from both libraries, edits fonts and options, and resto
 }) => {
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
   const preview = page.frameLocator("iframe");
   await page
-    .getByLabel("Left component library")
-    .getByRole("button", { name: "Insert Heading", exact: true })
+    .getByLabel("왼쪽 컴포넌트 목록")
+    .getByRole("button", { name: "제목 추가", exact: true })
     .click();
   await expect(preview.locator('[data-tweakloom-preset="heading"]')).toHaveText(
-    "Your next big idea",
+    "새로운 아이디어",
   );
   await page
-    .getByLabel("Font family", { exact: true })
+    .getByLabel("글꼴 종류", { exact: true })
     .selectOption("Trebuchet MS, sans-serif");
   await page
-    .getByRole("button", { name: "Apply fontFamily", exact: true })
+    .getByRole("button", { name: "글꼴 종류 적용", exact: true })
     .click();
-  await expect(page.getByLabel("Font family", { exact: true })).toHaveValue(
+  await expect(page.getByLabel("글꼴 종류", { exact: true })).toHaveValue(
     "Trebuchet MS, sans-serif",
   );
   await page
-    .getByRole("button", { name: "Apply fontFamily", exact: true })
+    .getByRole("button", { name: "글꼴 종류 적용", exact: true })
     .click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page
-    .getByLabel("Font family", { exact: true })
+    .getByLabel("글꼴 종류", { exact: true })
     .selectOption("Georgia, serif");
   await page
-    .getByRole("button", { name: "Apply fontFamily", exact: true })
+    .getByRole("button", { name: "글꼴 종류 적용", exact: true })
     .click();
   await expect(preview.locator('[data-tweakloom-preset="heading"]')).toHaveCSS(
     "font-family",
     "Georgia, serif",
   );
-  await page.getByRole("tab", { name: "Insert", exact: true }).click();
+  await page.getByRole("tab", { name: "추가", exact: true }).click();
   await page
-    .getByLabel("Right component library")
-    .getByRole("button", { name: "Insert Dropdown", exact: true })
+    .getByLabel("오른쪽 컴포넌트 목록")
+    .getByRole("button", { name: "드롭다운 추가", exact: true })
     .click();
   await expect(
     preview.locator('[data-tweakloom-preset="dropdown"]'),
   ).toBeVisible();
-  await page.getByLabel("Dropdown options").fill("Small\nMedium\nLarge");
-  await page
-    .getByRole("button", { name: "Apply options", exact: true })
-    .click();
+  await page.getByLabel("드롭다운 항목").fill("Small\nMedium\nLarge");
+  await page.getByRole("button", { name: "항목 적용", exact: true }).click();
   await expect(
     preview.locator('[data-tweakloom-preset="dropdown"] option'),
   ).toHaveText(["Small", "Medium", "Large"]);
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(preview.locator('[data-tweakloom-preset="heading"]')).toHaveCSS(
@@ -75,7 +73,7 @@ test("drags an existing component freely and keeps coordinates after reload", as
   page,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Drag behavior").selectOption("free");
+  await page.getByLabel("드래그 방식").selectOption("free");
   const title = page
     .frameLocator("iframe")
     .getByRole("heading", { name: "Make room for good work." });
@@ -86,10 +84,10 @@ test("drags an existing component freely and keeps coordinates after reload", as
   await page.mouse.move(box.x + 104, box.y + 52, { steps: 8 });
   await page.mouse.up();
   await expect(title).toHaveCSS("translate", "64px 32px");
-  await expect(page.getByLabel("Position X")).toHaveValue("64");
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByLabel("X 위치")).toHaveValue("64");
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
   await expect(title).toHaveCSS("translate", "none");
-  await page.getByLabel("8px grid", { exact: true }).check();
+  await page.getByLabel("8px 격자", { exact: true }).check();
   await title.scrollIntoViewIfNeeded();
   const reset = (await title.boundingBox())!;
   await page.mouse.move(reset.x + 40, reset.y + 20);
@@ -97,9 +95,9 @@ test("drags an existing component freely and keeps coordinates after reload", as
   await page.mouse.move(reset.x + 107, reset.y + 55, { steps: 8 });
   await page.mouse.up();
   await expect(title).toHaveCSS("translate", "64px 32px");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(title).toHaveCSS("translate", "64px 32px");
@@ -110,17 +108,17 @@ test("drags a component from the right library into the preview", async ({
 }) => {
   await page.goto("/");
   await expect(
-    page.getByText("Preview connected", { exact: true }),
+    page.getByText("미리보기 연결됨", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: "Insert", exact: true }).click();
-  await page.getByLabel("Drag behavior").selectOption("free");
+  await page.getByRole("tab", { name: "추가", exact: true }).click();
+  await page.getByLabel("드래그 방식").selectOption("free");
   const target = page
     .frameLocator("iframe")
     .locator('[data-tweakloom-id="draft-board"]');
   await target.scrollIntoViewIfNeeded();
   const source = await page
-    .getByLabel("Right component library")
-    .getByRole("button", { name: "Insert Button", exact: true })
+    .getByLabel("오른쪽 컴포넌트 목록")
+    .getByRole("button", { name: "버튼 추가", exact: true })
     .boundingBox();
   const box = (await target.boundingBox())!;
   await page.mouse.move(source!.x + 30, source!.y + 25);
@@ -136,7 +134,7 @@ test("drags a component from the right library into the preview", async ({
     .boundingBox())!;
   expect(Math.abs(placed.x - box.x - 70)).toBeLessThan(2);
   expect(Math.abs(placed.y - box.y - 60)).toBeLessThan(2);
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
   await expect(target.locator('[data-tweakloom-preset="button"]')).toHaveCount(
     0,
   );
@@ -150,33 +148,33 @@ test("configures page and API actions without navigation or outgoing requests", 
     .frameLocator("iframe")
     .getByRole("button", { name: /Find your essentials/ })
     .click();
-  await page.getByRole("tab", { name: "Actions", exact: true }).click();
-  await page.getByLabel("Action type").selectOption("navigate");
-  await page.getByLabel("Destination").fill("/checkout");
-  await page.getByRole("button", { name: "Apply action", exact: true }).click();
-  await page.getByRole("button", { name: "Test action", exact: true }).click();
+  await page.getByRole("tab", { name: "동작", exact: true }).click();
+  await page.getByLabel("동작 종류").selectOption("navigate");
+  await page.getByLabel("이동 경로").fill("/checkout");
+  await page.getByRole("button", { name: "동작 적용", exact: true }).click();
+  await page.getByRole("button", { name: "동작 테스트", exact: true }).click();
   await expect(
-    page.getByLabel("Action preview", { exact: true }),
+    page.getByLabel("동작 미리보기 결과", { exact: true }),
   ).toContainText("/checkout");
-  await page.getByLabel("Action type").selectOption("api");
+  await page.getByLabel("동작 종류").selectOption("api");
   await page.getByLabel("API URL").fill("https://example.com/orders");
-  await page.getByLabel("HTTP method").selectOption("POST");
-  await page.getByLabel("Request body (JSON)").fill('{"quantity":2}');
-  await page.getByLabel("Mock response (JSON)").fill('{"created":true}');
+  await page.getByLabel("HTTP 메서드").selectOption("POST");
+  await page.getByLabel("요청 본문 (JSON)").fill('{"quantity":2}');
+  await page.getByLabel("모의 응답 (JSON)").fill('{"created":true}');
   let outgoing = false;
   page.on("request", (request) => {
     if (request.url().includes("example.com/orders")) outgoing = true;
   });
-  await page.getByRole("button", { name: "Apply action", exact: true }).click();
-  await page.getByRole("button", { name: "Test action", exact: true }).click();
+  await page.getByRole("button", { name: "동작 적용", exact: true }).click();
+  await page.getByRole("button", { name: "동작 테스트", exact: true }).click();
   await expect(
-    page.getByLabel("Action preview", { exact: true }),
+    page.getByLabel("동작 미리보기 결과", { exact: true }),
   ).toContainText("created");
   expect(outgoing).toBe(false);
   expect(page.url()).toBe("http://127.0.0.1:5174/");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
   await expect(
-    page.getByText("Saved · revision 1", { exact: true }),
+    page.getByText("저장됨 · 버전 1", { exact: true }),
   ).toBeVisible();
   const draft = JSON.parse(await readFile(".tweakloom/e2e/draft.json", "utf8"));
   expect(

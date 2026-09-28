@@ -78,8 +78,8 @@ test("serializes revision-checked saves, retains a backup and preserves corrupt 
       1,
     );
     await writeFile(join(root, "draft.json"), "broken");
-    await assert.rejects(store.readDraft(root), /corrupt/i);
-    await assert.rejects(store.saveDraft(root, 2, sample()), /corrupt/i);
+    await assert.rejects(store.readDraft(root), /손상/i);
+    await assert.rejects(store.saveDraft(root, 2, sample()), /손상/i);
     assert.equal(await readFile(join(root, "draft.json"), "utf8"), "broken");
   } finally {
     await rm(root, { recursive: true, force: true });
