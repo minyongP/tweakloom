@@ -154,6 +154,44 @@ test("drags a component from the right library into the preview", async ({
   ).toHaveCount(0);
 });
 
+test("plain text defaults to no action and actions can be removed and undone", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const title = page
+    .frameLocator("iframe")
+    .locator('[data-tweakloom-id="hero-title"]');
+  await title.click();
+  await page.getByRole("tab", { name: "동작", exact: true }).click();
+  await expect(page.getByLabel("동작 종류")).toHaveValue("none");
+  await expect(page.getByLabel("이동 경로")).toHaveCount(0);
+  await page.getByLabel("동작 종류").selectOption("navigate");
+  await page.getByLabel("이동 경로").fill("/about");
+  await page.getByRole("button", { name: "동작 적용", exact: true }).click();
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
+  await expect(
+    page.getByText("저장됨 · 버전 1", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("동작 종류").selectOption("none");
+  await page.getByRole("button", { name: "동작 적용", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "동작 테스트", exact: true }),
+  ).toBeDisabled();
+  await expect(title).toHaveText("Make room for good work.");
+  await page.getByRole("button", { name: "되돌리기", exact: true }).click();
+  await expect(page.getByLabel("이동 경로")).toHaveValue("/about");
+  await page.getByRole("button", { name: "동작 삭제", exact: true }).click();
+  await expect(page.getByLabel("동작 종류")).toHaveValue("none");
+  await page.getByRole("button", { name: "편집안 저장", exact: true }).click();
+  await expect(
+    page.getByText("저장됨 · 버전 2", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await title.click();
+  await page.getByRole("tab", { name: "동작", exact: true }).click();
+  await expect(page.getByLabel("동작 종류")).toHaveValue("none");
+});
+
 test("configures page and API actions without navigation or outgoing requests", async ({
   page,
 }) => {

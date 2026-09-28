@@ -626,7 +626,9 @@ export function Actions({
   remove: () => void;
 }) {
   const saved = operation ? parseInteraction(operation.after) : null;
-  const [type, setType] = useState(saved?.type ?? "navigate");
+  const [type, setType] = useState<"none" | "navigate" | "api">(
+    saved?.type ?? "none",
+  );
   const [destination, setDestination] = useState(
     saved?.type === "navigate" ? saved.destination : "/",
   );
@@ -636,6 +638,11 @@ export function Actions({
   const [api, setApi] = useState(saved?.type === "api" ? saved : defaultApi);
   const [error, setError] = useState("");
   function save() {
+    if (type === "none") {
+      if (operation) remove();
+      setError("");
+      return;
+    }
     try {
       const action: Interaction =
         type === "navigate"
@@ -669,13 +676,21 @@ export function Actions({
           동작 종류
           <select
             value={type}
-            onChange={(e) => setType(e.target.value as "navigate" | "api")}
+            onChange={(e) => {
+              setType(e.target.value as "none" | "navigate" | "api");
+              setError("");
+            }}
           >
+            <option value="none">없음</option>
             <option value="navigate">페이지 이동</option>
             <option value="api">API 요청</option>
           </select>
         </label>
-        {type === "navigate" ? (
+        {type === "none" ? (
+          <p className="field-hint">
+            클릭 동작 없이 글이나 이미지로 표시합니다.
+          </p>
+        ) : type === "navigate" ? (
           <>
             <label>
               이동 경로
@@ -768,7 +783,11 @@ export function Actions({
         )}
         {error && <p role="alert">{error}</p>}
         <div className="action-buttons">
-          <button className="primary" onClick={save}>
+          <button
+            className="primary"
+            disabled={type === "none" && !operation}
+            onClick={save}
+          >
             동작 적용
           </button>
           <button disabled={!operation} onClick={test}>
