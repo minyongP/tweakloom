@@ -7,6 +7,8 @@ export const presets = [
   { id: "divider", label: "Divider", group: "Layout", tag: "hr" },
   { id: "card", label: "Card", group: "Layout", tag: "article" },
   { id: "frame", label: "Frame", group: "Layout", tag: "div" },
+  { id: "row", label: "Row", group: "Layout", tag: "div" },
+  { id: "grid", label: "Grid", group: "Layout", tag: "div" },
 ] as const;
 export type PresetId = (typeof presets)[number]["id"];
 export const fonts = [
@@ -103,5 +105,22 @@ export const styleFields = {
     options: ["stretch", "flex-start", "center", "flex-end"],
   },
   gap: { label: "Gap", group: "Auto layout", type: "px" },
+  flexWrap: {
+    label: "Wrap",
+    group: "Auto layout",
+    type: "select",
+    options: ["nowrap", "wrap"],
+  },
+  gridTemplateColumns: {
+    label: "Grid columns",
+    group: "Auto layout",
+    type: "select",
+    options: [
+      "repeat(1, minmax(0, 1fr))",
+      "repeat(2, minmax(0, 1fr))",
+      "repeat(3, minmax(0, 1fr))",
+      "repeat(4, minmax(0, 1fr))",
+    ],
+  },
   translate: { label: "Position", group: "Position", type: "translate" },
 } as const;

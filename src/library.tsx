@@ -31,7 +31,9 @@ export function Library({
           onChange={(e) => setQuery(e.target.value)}
         />
       </label>
-      <p className="library-hint">Drag into a frame, or click to insert.</p>
+      <p className="library-hint">
+        Drop between components. Layout takes care of spacing.
+      </p>
       {["Controls", "Content", "Layout"].map((group) => (
         <div className="library-group" key={group}>
           {visible.some((p) => p.group === group) && (
@@ -95,6 +97,12 @@ export function Library({
                         )}
                         {preset.id === "frame" && (
                           <span className="mini-frame">＋</span>
+                        )}
+                        {preset.id === "row" && (
+                          <span className="mini-frame">▯ ▯ ▯</span>
+                        )}
+                        {preset.id === "grid" && (
+                          <span className="mini-frame">▦</span>
                         )}
                       </span>
                       <span className="preset-name">

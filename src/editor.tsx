@@ -6,8 +6,14 @@ import {
   upsertOperation,
   validateDraft,
   removeOperation,
+  moveOperations,
 } from "./shared/draft.ts";
-import type { Draft, ElementInfo, Operation } from "./shared/draft.ts";
+import type {
+  Draft,
+  ElementInfo,
+  Operation,
+  Placement,
+} from "./shared/draft.ts";
 import { presets } from "./shared/catalog.ts";
 import type { PresetId } from "./shared/catalog.ts";
 import { Library } from "./library.tsx";
@@ -54,6 +60,7 @@ function App() {
   );
   const [simulate, setSimulate] = useState(false);
   const [snap, setSnap] = useState(false);
+  const [freeMove, setFreeMove] = useState(false);
   const [simulation, setSimulation] = useState("");
   const pendingSelect = useRef<string | null>(null);
   const [channel] = useState(() => crypto.randomUUID());
@@ -117,6 +124,7 @@ function App() {
           editable: !saving && !reloading,
           simulate,
           snap,
+          freeMove,
         });
       }
       if (
@@ -141,7 +149,30 @@ function App() {
       if (event.data.type === "edit" && !saving && !reloading)
         apply(event.data.operation);
       if (event.data.type === "insert-request" && !saving && !reloading)
-        insert(event.data.preset, event.data.parentId, event.data.placement);
+        insert(
+          event.data.preset,
+          event.data.parentId,
+          event.data.placement,
+          event.data.beforeId,
+        );
+      if (
+        event.data.type === "move-request" &&
+        !saving &&
+        !reloading &&
+        !simulate
+      ) {
+        const target = elements.find((el) => el.id === event.data.id);
+        if (target)
+          try {
+            checkContainer(event.data.placement.parentId, target.tag);
+            change(
+              moveOperations(draft.operations, target, event.data.placement),
+            );
+            setError("");
+          } catch (e) {
+            setError((e as Error).message);
+          }
+      }
       if (
         event.data.type === "simulation" &&
         typeof event.data.text === "string"
@@ -152,10 +183,16 @@ function App() {
     }
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [channel, draft, saving, reloading, simulate, snap]);
+  }, [channel, draft, saving, reloading, simulate, snap, freeMove, elements]);
   useEffect(() => {
-    send({ type: "settings", editable: !saving && !reloading, simulate, snap });
-  }, [saving, reloading, simulate, snap, connected]);
+    send({
+      type: "settings",
+      editable: !saving && !reloading,
+      simulate,
+      snap,
+      freeMove,
+    });
+  }, [saving, reloading, simulate, snap, freeMove, connected]);
   useEffect(() => {
     if (!loaded) return;
     send({ type: "draft", draft });
@@ -182,18 +219,35 @@ function App() {
     setDraft({ ...draft, operations });
   }
   function apply(op: Operation) {
+    applyMany([op]);
+  }
+  function applyMany(ops: Operation[]) {
     if (saving || reloading) return;
     try {
-      change(upsertOperation(draft.operations, op));
+      change(
+        ops.reduce(
+          (operations, op) => upsertOperation(operations, op),
+          draft.operations,
+        ),
+      );
       setError("");
     } catch (e) {
       setError((e as Error).message);
     }
   }
+  function checkContainer(id: string, tag: string) {
+    const container = elements.find((el) => el.id === id);
+    if (!container?.container) throw new Error("Select an insertion frame.");
+    if (container.accepts && !container.accepts.includes(tag))
+      throw new Error(
+        `${id} accepts ${container.accepts.join(", ")} components only.`,
+      );
+  }
   function insert(
     presetId: PresetId,
     parentId?: string,
     placement?: { before: string; after: string },
+    beforeId?: string | null,
   ) {
     if (!loaded || saving || reloading) return;
     const preset = presets.find((p) => p.id === presetId);
@@ -204,6 +258,7 @@ function App() {
       (selected?.container ? selected.id : selected?.parentId) ??
       "draft-board";
     try {
+      checkContainer(parent, preset.tag);
       pendingSelect.current = id;
       let operations = upsertOperation(draft.operations, {
         targetId: id,
@@ -222,6 +277,12 @@ function App() {
           before: placement.before,
           after: placement.after,
         });
+      if (beforeId)
+        operations = moveOperations(
+          operations,
+          { id, tag: preset.tag, parentId: parent },
+          { parentId: parent, beforeId },
+        );
       change(operations);
       setRightTab("Design");
       setError("");
@@ -338,19 +399,35 @@ function App() {
           <div className="canvas-toolbar">
             <div>
               <span className="mode-indicator">↖</span>
-              <strong>{simulate ? "Preview actions" : "Move & edit"}</strong>
+              <strong>
+                {simulate
+                  ? "Preview actions"
+                  : freeMove
+                    ? "Free move"
+                    : "Auto layout"}
+              </strong>
               <span className="toolbar-divider" />
               <span className="muted">Click to select · drag to move</span>
             </div>
             <div className="canvas-options">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={snap}
-                  onChange={(e) => setSnap(e.target.checked)}
-                />
-                8px grid
-              </label>
+              <select
+                aria-label="Drag behavior"
+                value={freeMove ? "free" : "flow"}
+                onChange={(e) => setFreeMove(e.target.value === "free")}
+              >
+                <option value="flow">Arrange components</option>
+                <option value="free">Free move (advanced)</option>
+              </select>
+              {freeMove && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={snap}
+                    onChange={(e) => setSnap(e.target.checked)}
+                  />
+                  8px grid
+                </label>
+              )}
               <label>
                 <input
                   type="checkbox"
@@ -463,6 +540,11 @@ function App() {
               element={selected}
               disabled={saving || reloading}
               apply={apply}
+              applyMany={applyMany}
+              freeMove={freeMove}
+              nudge={(direction) =>
+                send({ type: "nudge", id: selected.id, direction })
+              }
             />
           ) : (
             <div className="empty-inspector">

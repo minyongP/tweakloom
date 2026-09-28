@@ -79,9 +79,9 @@ export function createPreset(id: string): HTMLElement {
     text.style.margin = "0";
     el.append(title, text);
   }
-  if (id === "frame") {
+  if (["frame", "row", "grid"].includes(id)) {
     el.dataset.tweakloomContainer = "";
-    el.setAttribute("aria-label", "Frame");
+    el.setAttribute("aria-label", preset.label);
     Object.assign(el.style, {
       width: "300px",
       minHeight: "140px",
@@ -93,6 +93,20 @@ export function createPreset(id: string): HTMLElement {
       gap: "12px",
       backgroundColor: "#faf8ff",
     });
+    if (id === "row")
+      Object.assign(el.style, {
+        width: "100%",
+        flexDirection: "row",
+        flexWrap: "wrap",
+        alignItems: "center",
+      });
+    if (id === "grid")
+      Object.assign(el.style, {
+        width: "100%",
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        alignItems: "start",
+      });
   }
   return el;
 }

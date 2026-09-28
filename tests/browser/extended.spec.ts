@@ -75,6 +75,7 @@ test("drags an existing component freely and keeps coordinates after reload", as
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("Drag behavior").selectOption("free");
   const title = page
     .frameLocator("iframe")
     .getByRole("heading", { name: "Make room for good work." });
@@ -112,6 +113,7 @@ test("drags a component from the right library into the preview", async ({
     page.getByText("Preview connected", { exact: true }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Insert", exact: true }).click();
+  await page.getByLabel("Drag behavior").selectOption("free");
   const target = page
     .frameLocator("iframe")
     .locator('[data-tweakloom-id="draft-board"]');

@@ -12,10 +12,16 @@ export function Inspector({
   element,
   disabled,
   apply,
+  applyMany,
+  freeMove,
+  nudge,
 }: {
   element: ElementInfo;
   disabled: boolean;
   apply: (op: Operation) => void;
+  applyMany: (ops: Operation[]) => void;
+  freeMove: boolean;
+  nudge: (direction: "earlier" | "later") => void;
 }) {
   const editing = useRef(new Set<string>());
   const [text, setText] = useState(element.text);
@@ -101,54 +107,136 @@ export function Inspector({
           </span>
         </div>
       </div>
-      <section className="property-section">
-        <h3>Position</h3>
-        <div className="position-row">
-          <label>
-            X
-            <input
-              aria-label="Position X"
-              type="number"
-              min="-9999"
-              max="9999"
-              value={x}
-              onChange={(e) => {
-                editing.current.add("translate");
-                setX(e.target.value);
-              }}
-            />
-          </label>
-          <label>
-            Y
-            <input
-              aria-label="Position Y"
-              type="number"
-              min="-9999"
-              max="9999"
-              value={y}
-              onChange={(e) => {
-                editing.current.add("translate");
-                setY(e.target.value);
-              }}
-            />
-          </label>
-          <button
-            aria-label="Apply position"
-            onClick={() => style("translate", `${x}px ${y}px`)}
-          >
-            ↵
-          </button>
-          <button
-            aria-label="Reset position"
-            onClick={() => style("translate", "none")}
-          >
-            ↺
-          </button>
-        </div>
-        <p className="field-hint">
-          Drag on the page, or set offsets from the original layout.
-        </p>
-      </section>
+      {!freeMove && (
+        <section className="property-section">
+          <h3>Layout placement</h3>
+          <p className="field-hint">
+            {element.parentId
+              ? `Inside ${element.parentId.replaceAll("-", " ")}. Drag between components to rearrange.`
+              : "Select a component inside a frame to rearrange it."}
+          </p>
+          <div className="layout-buttons">
+            <button
+              disabled={!element.parentId}
+              onClick={() => nudge("earlier")}
+            >
+              Move earlier
+            </button>
+            <button disabled={!element.parentId} onClick={() => nudge("later")}>
+              Move later
+            </button>
+          </div>
+          {element.styles.translate !== "none" && (
+            <button
+              className="small-apply"
+              onClick={() => style("translate", "none")}
+            >
+              Return to layout
+            </button>
+          )}
+        </section>
+      )}
+      {freeMove && (
+        <section className="property-section">
+          <h3>Position</h3>
+          <div className="position-row">
+            <label>
+              X
+              <input
+                aria-label="Position X"
+                type="number"
+                min="-9999"
+                max="9999"
+                value={x}
+                onChange={(e) => {
+                  editing.current.add("translate");
+                  setX(e.target.value);
+                }}
+              />
+            </label>
+            <label>
+              Y
+              <input
+                aria-label="Position Y"
+                type="number"
+                min="-9999"
+                max="9999"
+                value={y}
+                onChange={(e) => {
+                  editing.current.add("translate");
+                  setY(e.target.value);
+                }}
+              />
+            </label>
+            <button
+              aria-label="Apply position"
+              onClick={() => style("translate", `${x}px ${y}px`)}
+            >
+              ↵
+            </button>
+            <button
+              aria-label="Reset position"
+              onClick={() => style("translate", "none")}
+            >
+              ↺
+            </button>
+          </div>
+          <p className="field-hint">
+            Drag on the page, or set offsets from the original layout.
+          </p>
+        </section>
+      )}
+      {element.container && (
+        <section className="property-section">
+          <h3>Arrange children</h3>
+          <div className="layout-buttons">
+            {(["Row", "Column", "Grid"] as const).map((layout) => (
+              <button
+                key={layout}
+                aria-label={`${layout} layout`}
+                onClick={() => {
+                  const styles: Partial<Record<StyleProperty, string>> =
+                    layout === "Grid"
+                      ? {
+                          display: "grid",
+                          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                          gap: "16px",
+                        }
+                      : {
+                          display: "flex",
+                          flexDirection: layout === "Row" ? "row" : "column",
+                          flexWrap: layout === "Row" ? "wrap" : "nowrap",
+                          alignItems: "flex-start",
+                        };
+                  applyMany(
+                    Object.entries(styles).map(([property, after]) => ({
+                      targetId: element.id,
+                      tag: element.tag,
+                      kind: "style",
+                      property: property as StyleProperty,
+                      before:
+                        element.baseline?.styles[property as StyleProperty] ??
+                        element.styles[property as StyleProperty],
+                      after,
+                    })),
+                  );
+                }}
+              >
+                {layout === "Row"
+                  ? "↔ Row"
+                  : layout === "Column"
+                    ? "↕ Column"
+                    : "▦ Grid"}
+              </button>
+            ))}
+          </div>
+          <p className="field-hint">
+            Spacing and alignment follow this frame. Drop at an edge to place
+            beside a frame, or in its center to place inside.
+            {element.accepts ? ` Accepts: ${element.accepts.join(", ")}.` : ""}
+          </p>
+        </section>
+      )}
       {element.leaf && (
         <section className="property-section">
           <h3>Content</h3>
@@ -214,100 +302,103 @@ export function Inspector({
           </button>
         </section>
       )}
-      {["Typography", "Appearance", "Size & spacing", "Auto layout"].map(
-        (group) => (
-          <section className="property-section" key={group}>
-            <h3>{group}</h3>
-            {Object.entries(styleFields)
-              .filter(([, field]) => field.group === group)
-              .map(([key, field]) => {
-                const property = key as StyleProperty;
-                const select = field.type === "select",
-                  color = field.type === "color",
-                  number = field.type === "number";
-                return (
-                  <div
-                    className={`property ${select ? "wide-property" : ""}`}
-                    key={key}
-                  >
-                    <label htmlFor={key}>
-                      {field.label}
-                      {!select && !color && !number ? " (px)" : ""}
-                    </label>
-                    <div className="property-control">
-                      {select ? (
-                        <select
-                          id={key}
-                          value={values[property]}
-                          onChange={(e) => {
-                            editing.current.add(key);
-                            setValues({ ...values, [key]: e.target.value });
-                          }}
-                        >
-                          {!(field.options as readonly string[]).includes(
-                            values[property],
-                          ) && (
-                            <option value={values[property]}>
-                              {values[property] || "Inherited"}
-                            </option>
-                          )}
-                          {field.options.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          id={key}
-                          type={color ? "color" : number ? "number" : "text"}
-                          min={field.type === "signed-px" ? -9999 : 0}
-                          max={number ? 1 : 9999}
-                          step={number ? 0.05 : 0.1}
-                          value={values[property]}
-                          onChange={(e) => {
-                            editing.current.add(key);
-                            setValues({ ...values, [key]: e.target.value });
-                          }}
-                        />
-                      )}
-                      {color && (
-                        <span className="hex-value">
-                          {element.styles[property] === "rgba(0, 0, 0, 0)" &&
-                          !editing.current.has(key)
-                            ? "none"
-                            : values[property]}
-                        </span>
-                      )}
-                      <button
-                        aria-label={`Apply ${key}`}
-                        onClick={() =>
-                          style(
-                            property,
-                            select ||
-                              color ||
-                              number ||
-                              ["auto", "normal"].includes(values[property])
-                              ? values[property]
-                              : `${values[property]}px`,
-                          )
-                        }
+      {[
+        "Typography",
+        "Appearance",
+        "Size & spacing",
+        ...(element.container ? ["Auto layout"] : []),
+      ].map((group) => (
+        <section className="property-section" key={group}>
+          <h3>{group}</h3>
+          {Object.entries(styleFields)
+            .filter(([, field]) => field.group === group)
+            .map(([key, field]) => {
+              const property = key as StyleProperty;
+              const select = field.type === "select",
+                color = field.type === "color",
+                number = field.type === "number";
+              return (
+                <div
+                  className={`property ${select ? "wide-property" : ""}`}
+                  key={key}
+                >
+                  <label htmlFor={key}>
+                    {field.label}
+                    {!select && !color && !number ? " (px)" : ""}
+                  </label>
+                  <div className="property-control">
+                    {select ? (
+                      <select
+                        id={key}
+                        value={values[property]}
+                        onChange={(e) => {
+                          editing.current.add(key);
+                          setValues({ ...values, [key]: e.target.value });
+                        }}
                       >
-                        ↵
-                      </button>
-                    </div>
+                        {!(field.options as readonly string[]).includes(
+                          values[property],
+                        ) && (
+                          <option value={values[property]}>
+                            {values[property] || "Inherited"}
+                          </option>
+                        )}
+                        {field.options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={key}
+                        type={color ? "color" : number ? "number" : "text"}
+                        min={field.type === "signed-px" ? -9999 : 0}
+                        max={number ? 1 : 9999}
+                        step={number ? 0.05 : 0.1}
+                        value={values[property]}
+                        onChange={(e) => {
+                          editing.current.add(key);
+                          setValues({ ...values, [key]: e.target.value });
+                        }}
+                      />
+                    )}
+                    {color && (
+                      <span className="hex-value">
+                        {element.styles[property] === "rgba(0, 0, 0, 0)" &&
+                        !editing.current.has(key)
+                          ? "none"
+                          : values[property]}
+                      </span>
+                    )}
+                    <button
+                      aria-label={`Apply ${key}`}
+                      onClick={() =>
+                        style(
+                          property,
+                          select ||
+                            color ||
+                            number ||
+                            ["auto", "normal"].includes(values[property])
+                            ? values[property]
+                            : `${values[property]}px`,
+                        )
+                      }
+                    >
+                      ↵
+                    </button>
                   </div>
-                );
-              })}
-            {group === "Auto layout" && (
-              <p className="field-hint">
-                Choose Flex to arrange children in a row or column. Distribution
-                and alignment apply to the container.
-              </p>
-            )}
-          </section>
-        ),
-      )}
+                </div>
+              );
+            })}
+          {group === "Auto layout" && (
+            <p className="field-hint">
+              Choose Flex to arrange children in a row or column. Distribution
+              and alignment apply to the container.
+            </p>
+          )}
+        </section>
+      ))}
     </fieldset>
   );
 }

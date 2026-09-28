@@ -7,7 +7,7 @@ export type Operation = {
   before: string;
   after: string;
 } & (
-  | { kind: "text" | "options" | "interaction" }
+  | { kind: "text" | "options" | "interaction" | "move" }
   | { kind: "style"; property: StyleProperty }
   | { kind: "insert"; parentId: string }
 );
@@ -37,6 +37,8 @@ export type ElementInfo = {
   styles: Record<StyleProperty, string>;
   container?: boolean;
   parentId?: string;
+  nextId?: string | null;
+  accepts?: string[];
   options?: string[];
   baseline?: {
     text: string;
@@ -53,6 +55,19 @@ export const emptyDraft = (): Draft => ({
 export const operationKey = (op: Operation) =>
   `${op.targetId}:${op.kind === "style" ? op.property : op.kind}`;
 const idPattern = /^[a-zA-Z0-9_-]{1,80}$/;
+export type Placement = { parentId: string; beforeId: string | null };
+export function parsePlacement(raw: string): Placement {
+  const value = JSON.parse(raw);
+  if (
+    !value ||
+    typeof value.parentId !== "string" ||
+    !idPattern.test(value.parentId) ||
+    (value.beforeId !== null &&
+      (typeof value.beforeId !== "string" || !idPattern.test(value.beforeId)))
+  )
+    throw new Error("Invalid layout placement");
+  return value;
+}
 const px = /^(0|[1-9]\d{0,3})(\.\d{1,2})?px$/;
 const signedPx = /^-?(0|[1-9]\d{0,3})(\.\d{1,2})?px$/;
 function safeUrl(value: unknown): value is string {
@@ -181,6 +196,14 @@ export function validateDraft(value: unknown): asserts value is Draft {
       )
         throw new Error("Invalid component insertion");
       inserts.set(op.targetId, op.parentId);
+    } else if (op.kind === "move") {
+      const placement = parsePlacement(op.after);
+      if (
+        placement.parentId === op.targetId ||
+        placement.beforeId === op.targetId ||
+        (op.before !== "" && !idPattern.test(op.before))
+      )
+        throw new Error("Invalid component move");
     } else if (op.kind === "interaction") parseInteraction(op.after);
     else if (op.kind === "options") {
       const options = JSON.parse(op.after);
@@ -250,7 +273,73 @@ export function removeOperation(
         changed = true;
       }
   }
-  return operations.filter(
-    (op) => !ids.has(op.targetId) && operationKey(op) !== operationKey(removed),
+  return operations
+    .filter(
+      (op) =>
+        !ids.has(op.targetId) && operationKey(op) !== operationKey(removed),
+    )
+    .filter(
+      (op) => op.kind !== "move" || !ids.has(parsePlacement(op.after).parentId),
+    )
+    .map((op) =>
+      op.kind === "move" && ids.has(parsePlacement(op.after).beforeId ?? "")
+        ? {
+            ...op,
+            after: JSON.stringify({
+              ...parsePlacement(op.after),
+              beforeId: null,
+            }),
+          }
+        : op,
+    );
+}
+
+export function moveOperations(
+  operations: Operation[],
+  target: {
+    id: string;
+    tag: string;
+    parentId?: string;
+    nextId?: string | null;
+  },
+  placement: Placement,
+): Operation[] {
+  const previous = operations.find(
+    (op) => op.targetId === target.id && op.kind === "move",
   );
+  const insertion = operations.find(
+    (op) => op.targetId === target.id && op.kind === "insert",
+  );
+  const next = operations
+    .filter(
+      (op) =>
+        !(
+          op.targetId === target.id &&
+          (op.kind === "move" ||
+            (op.kind === "style" && op.property === "translate"))
+        ),
+    )
+    .map((op) =>
+      op.targetId === target.id && op.kind === "insert"
+        ? { ...op, parentId: placement.parentId }
+        : op,
+    )
+    .map((op) =>
+      op.kind === "move" && parsePlacement(op.after).beforeId === target.id
+        ? {
+            ...op,
+            after: JSON.stringify({
+              ...parsePlacement(op.after),
+              beforeId: target.nextId ?? null,
+            }),
+          }
+        : op,
+    );
+  return upsertOperation(next, {
+    targetId: target.id,
+    tag: target.tag,
+    kind: "move",
+    before: insertion ? "" : (previous?.before ?? target.parentId ?? ""),
+    after: JSON.stringify(placement),
+  });
 }

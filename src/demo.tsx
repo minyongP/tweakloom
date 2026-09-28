@@ -70,6 +70,7 @@ function Demo() {
             className="cards"
             data-tweakloom-id="collection-cards"
             data-tweakloom-container=""
+            data-tweakloom-accept="article div"
           >
             <article data-tweakloom-id="card-notes" data-tweakloom-container="">
               <span className="number">01 / CAPTURE</span>

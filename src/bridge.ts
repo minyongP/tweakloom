@@ -5,8 +5,14 @@ import {
   styleProperties,
   validateDraft,
   parseInteraction,
+  parsePlacement,
 } from "./shared/draft.ts";
-import type { Draft, ElementInfo, Operation } from "./shared/draft.ts";
+import type {
+  Draft,
+  ElementInfo,
+  Operation,
+  Placement,
+} from "./shared/draft.ts";
 import { createPreset } from "./presets.ts";
 
 const channel = new URLSearchParams(location.hash.slice(1)).get("tweakloom");
@@ -20,10 +26,23 @@ function start(channel: string) {
     pending = false,
     editable = true,
     simulate = false,
+    freeMove = false,
     snap = false;
   let lastReport = "",
     suppressClickUntil = 0;
   const inserted = new Set<HTMLElement>();
+  const moved: {
+    element: HTMLElement;
+    parent: Node;
+    next: Node | null;
+    appliedParent: Node;
+  }[] = [];
+  // Outside the observed app subtree so drawing the guide never triggers replay.
+  const guide = document.createElement("div");
+  guide.setAttribute("aria-label", "Insertion guide");
+  guide.style.cssText =
+    "display:none;position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #7956ce;background:#7956ce22;border-radius:3px;";
+  document.documentElement.append(guide);
   const active = new Map<
     string,
     {
@@ -84,6 +103,12 @@ function start(channel: string) {
     parentId: el.parentElement?.closest<HTMLElement>(
       "[data-tweakloom-container]",
     )?.dataset.tweakloomId,
+    accepts: el.dataset.tweakloomAccept?.split(" "),
+    nextId:
+      [...(el.parentElement?.children ?? [])]
+        .slice([...(el.parentElement?.children ?? [])].indexOf(el) + 1)
+        .find((next) => next.hasAttribute("data-tweakloom-id"))
+        ?.getAttribute("data-tweakloom-id") ?? null,
     options: options(el),
     styles: Object.fromEntries(
       styleProperties.map((key) => [key, getComputedStyle(el)[key]]),
@@ -113,7 +138,21 @@ function start(channel: string) {
       )
         write(previous.element, previous.operation, previous.original);
     active.clear();
+    for (const item of moved.reverse()) {
+      if (
+        item.element.parentNode === item.appliedParent &&
+        item.parent.isConnected
+      )
+        item.parent.insertBefore(
+          item.element,
+          item.next?.parentNode === item.parent ? item.next : null,
+        );
+    }
+    moved.length = 0;
   }
+  const accepts = (parent: HTMLElement, tag: string) =>
+    !parent.dataset.tweakloomAccept ||
+    parent.dataset.tweakloomAccept.split(" ").includes(tag);
   function reconcile() {
     observer.disconnect();
     restore();
@@ -142,6 +181,13 @@ function start(channel: string) {
           remaining.splice(i--, 1);
           continue;
         }
+        if (!accepts(parents[0], op.tag)) {
+          conflicts.push(
+            `${op.parentId}: accepts ${parents[0].dataset.tweakloomAccept} components only`,
+          );
+          remaining.splice(i--, 1);
+          continue;
+        }
         const element = createPreset(op.after);
         element.dataset.tweakloomId = op.targetId;
         parents[0].append(element);
@@ -161,7 +207,7 @@ function start(channel: string) {
       ),
     );
     for (const op of draft.operations) {
-      if (op.kind === "insert") continue;
+      if (op.kind === "insert" || op.kind === "move") continue;
       const matches = candidates(op.targetId);
       if (matches.length !== 1) {
         conflicts.push(
@@ -199,6 +245,38 @@ function start(channel: string) {
         original,
         applied: read(el, op),
       });
+    }
+    for (const op of draft.operations.filter((op) => op.kind === "move")) {
+      const placement = parsePlacement(op.after);
+      const matches = candidates(op.targetId),
+        parents = candidates(placement.parentId);
+      const anchors = placement.beforeId ? candidates(placement.beforeId) : [];
+      const el = matches[0],
+        container = parents[0],
+        anchor = anchors[0] ?? null;
+      if (
+        matches.length !== 1 ||
+        parents.length !== 1 ||
+        el.tagName.toLowerCase() !== op.tag ||
+        !container.hasAttribute("data-tweakloom-container") ||
+        !accepts(container, op.tag) ||
+        el.contains(container) ||
+        (placement.beforeId &&
+          (anchors.length !== 1 || anchor?.parentElement !== container)) ||
+        (op.before && baselines.get(el)?.parentId !== op.before)
+      ) {
+        conflicts.push(
+          `${op.targetId}: layout target changed or violates container rules`,
+        );
+        continue;
+      }
+      moved.push({
+        element: el,
+        parent: el.parentNode!,
+        next: el.nextSibling,
+        appliedParent: container,
+      });
+      container.insertBefore(el, anchor);
     }
     for (const el of document.querySelectorAll("[data-tweakloom-selected]"))
       el.removeAttribute("data-tweakloom-selected");
@@ -281,10 +359,41 @@ function start(channel: string) {
       editable = message.editable === true;
       simulate = message.simulate === true;
       snap = message.snap === true;
+      if (freeMove !== (message.freeMove === true) && drag) cancelDrag();
+      freeMove = message.freeMove === true;
       if (!editable && drag) cancelDrag();
       document.documentElement.dataset.tweakloomMode = simulate
         ? "preview"
         : "edit";
+    } else if (
+      message.type === "nudge" &&
+      editable &&
+      !simulate &&
+      typeof message.id === "string" &&
+      ["earlier", "later"].includes(message.direction)
+    ) {
+      const el = candidates(message.id)[0],
+        container = el?.parentElement;
+      if (!el || !container?.hasAttribute("data-tweakloom-container")) return;
+      const siblings = [...container.children].filter((child) =>
+        child.hasAttribute("data-tweakloom-id"),
+      );
+      const index = siblings.indexOf(el),
+        targetIndex = index + (message.direction === "earlier" ? -1 : 1);
+      if (targetIndex < 0 || targetIndex >= siblings.length) return;
+      const anchor =
+        message.direction === "earlier"
+          ? siblings[targetIndex]
+          : siblings[targetIndex + 1];
+      send({
+        type: "move-request",
+        id: el.dataset.tweakloomId,
+        placement: {
+          parentId: container.dataset.tweakloomId,
+          beforeId:
+            (anchor as HTMLElement | undefined)?.dataset.tweakloomId ?? null,
+        },
+      });
     } else if (message.type === "test-action" && typeof message.id === "string")
       testAction(message.id);
   });
@@ -292,6 +401,85 @@ function start(channel: string) {
     target instanceof Element
       ? target.closest<HTMLElement>("[data-tweakloom-id]")
       : null;
+  function findPlacement(
+    x: number,
+    y: number,
+    moving?: HTMLElement,
+  ): Placement | null {
+    let container =
+      document
+        .elementFromPoint(x, y)
+        ?.closest<HTMLElement>("[data-tweakloom-container]") ?? null;
+    if (
+      container &&
+      container !== moving &&
+      container.parentElement?.hasAttribute("data-tweakloom-container")
+    ) {
+      // ponytail: a 12px edge targets siblings; add explicit drop zones if nested frames become ambiguous.
+      const rect = container.getBoundingClientRect();
+      if (
+        y < rect.top + 12 ||
+        y > rect.bottom - 12 ||
+        x < rect.left + 12 ||
+        x > rect.right - 12
+      )
+        container = container.parentElement;
+    }
+    if (container === moving)
+      container =
+        moving.parentElement?.closest<HTMLElement>(
+          "[data-tweakloom-container]",
+        ) ?? null;
+    if (
+      !container ||
+      (moving &&
+        (moving.contains(container) ||
+          !accepts(container, moving.tagName.toLowerCase())))
+    ) {
+      guide.style.display = "none";
+      return null;
+    }
+    const css = getComputedStyle(container);
+    const horizontal =
+      css.display.includes("grid") ||
+      (css.display.includes("flex") && css.flexDirection.startsWith("row"));
+    const reverse =
+      css.flexDirection.endsWith("reverse") && css.display.includes("flex");
+    const children = [...container.children].filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        el !== moving &&
+        !!el.dataset.tweakloomId &&
+        getComputedStyle(el).position !== "absolute",
+    );
+    const anchor = children.find((child) => {
+      const r = child.getBoundingClientRect();
+      if (horizontal)
+        return (
+          y < r.top ||
+          (y <= r.bottom &&
+            (reverse ? x > r.left + r.width / 2 : x < r.left + r.width / 2))
+        );
+      return reverse ? y > r.top + r.height / 2 : y < r.top + r.height / 2;
+    });
+    const rect = (
+      anchor ??
+      children.at(-1) ??
+      container
+    ).getBoundingClientRect();
+    const end = !anchor;
+    Object.assign(guide.style, {
+      display: "block",
+      left: `${horizontal && children.length ? (end !== reverse ? rect.right : rect.left) - 2 : rect.left}px`,
+      top: `${!horizontal && children.length ? (end !== reverse ? rect.bottom : rect.top) - 2 : rect.top}px`,
+      width: `${horizontal && children.length ? 4 : rect.width}px`,
+      height: `${!horizontal && children.length ? 4 : rect.height}px`,
+    });
+    return {
+      parentId: container.dataset.tweakloomId!,
+      beforeId: anchor?.dataset.tweakloomId ?? null,
+    };
+  }
   document.addEventListener(
     "click",
     (event) => {
@@ -334,7 +522,7 @@ function start(channel: string) {
       const position = getComputedStyle(el)
         .translate.split(" ")
         .map((v) => parseFloat(v) || 0);
-      // ponytail: translate keeps source layout slots; reparenting needs source-aware layout operations.
+      // Legacy free-move drafts retain their visual offsets.
       drag = {
         element: el,
         pointer: event.pointerId,
@@ -363,6 +551,10 @@ function start(channel: string) {
         drag.element.setPointerCapture(event.pointerId);
       }
       event.preventDefault();
+      if (!freeMove) {
+        findPlacement(event.clientX, event.clientY, drag.element);
+        return;
+      }
       const round = (v: number) =>
         Math.max(
           -9999,
@@ -373,6 +565,7 @@ function start(channel: string) {
     true,
   );
   function cancelDrag() {
+    guide.style.display = "none";
     if (drag) {
       drag.element.style.translate = drag.inline;
       drag = null;
@@ -387,6 +580,24 @@ function start(channel: string) {
       const state = drag;
       drag = null;
       if (!state.moved) return;
+      if (!freeMove) {
+        const placement = findPlacement(
+          event.clientX,
+          event.clientY,
+          state.element,
+        );
+        guide.style.display = "none";
+        selected = state.element.dataset.tweakloomId!;
+        suppressClickUntil = Date.now() + 250;
+        reconcile();
+        if (placement) send({ type: "move-request", id: selected, placement });
+        else
+          send({
+            type: "error",
+            error: "Drop into a compatible frame or between its components.",
+          });
+        return;
+      }
       const after = state.element.style.translate;
       state.element.style.translate = state.inline;
       selected = state.element.dataset.tweakloomId!;
@@ -417,11 +628,19 @@ function start(channel: string) {
     if (
       editable &&
       initialized &&
+      !simulate &&
       event.dataTransfer?.types.includes("application/x-tweakloom")
     ) {
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
+      if (!freeMove) findPlacement(event.clientX, event.clientY);
     }
+  });
+  document.addEventListener("dragleave", (event) => {
+    if (!event.relatedTarget) guide.style.display = "none";
+  });
+  document.addEventListener("dragend", () => {
+    guide.style.display = "none";
   });
   document.addEventListener("drop", (event) => {
     if (!editable || !initialized || simulate) return;
@@ -434,6 +653,24 @@ function start(channel: string) {
         !presets.some((p) => p.id === value.preset)
       )
         return;
+      if (!freeMove) {
+        event.preventDefault();
+        const placement = findPlacement(event.clientX, event.clientY);
+        guide.style.display = "none";
+        if (placement)
+          send({
+            type: "insert-request",
+            preset: value.preset,
+            parentId: placement.parentId,
+            beforeId: placement.beforeId,
+          });
+        else
+          send({
+            type: "error",
+            error: "Drop into a frame or the Draft board.",
+          });
+        return;
+      }
       const container =
         event.target instanceof Element
           ? event.target.closest<HTMLElement>("[data-tweakloom-container]")

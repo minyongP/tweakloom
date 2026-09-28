@@ -260,3 +260,54 @@ test("rejects inherited style keys and cycles, and removes inserted subtree edit
     model.validateDraft({ ...model.emptyDraft(), operations: [child] }),
   );
 });
+
+test("layout moves are validated, preserve source baselines and clean up removed frames", () => {
+  const parent: model.Operation = {
+    targetId: "draft-frame",
+    tag: "div",
+    kind: "insert",
+    parentId: "draft-board",
+    before: "",
+    after: "frame",
+  };
+  const moved = model.moveOperations(
+    [parent],
+    { id: "hero-title", tag: "h1", parentId: "hero-content" },
+    { parentId: "draft-frame", beforeId: null },
+  );
+  assert.equal(moved.at(-1)?.before, "hero-content");
+  const again = model.moveOperations(
+    moved,
+    { id: "hero-title", tag: "h1", parentId: "draft-frame" },
+    { parentId: "draft-board", beforeId: null },
+  );
+  assert.equal(again.at(-1)?.before, "hero-content");
+  assert.deepEqual(model.removeOperation(moved, parent), []);
+  for (const after of [
+    "{}",
+    '{"parentId":"draft-board","beforeId":4}',
+    '{"parentId":"hero-title","beforeId":null}',
+  ]) {
+    assert.throws(() =>
+      model.validateDraft({
+        ...model.emptyDraft(),
+        operations: [
+          {
+            targetId: "hero-title",
+            tag: "h1",
+            kind: "move",
+            before: "hero-content",
+            after,
+          },
+        ],
+      }),
+    );
+  }
+  assert.throws(() =>
+    model.moveOperations(
+      [parent],
+      { id: "draft-frame", tag: "div", parentId: "draft-board" },
+      { parentId: "draft-frame", beforeId: null },
+    ),
+  );
+});
